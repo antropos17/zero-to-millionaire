@@ -30,7 +30,8 @@
   let M = freshMeta();
 
   function validState(s) {
-    if (!s || s.v !== 6) return false;
+    if (!s || s.v !== 7) return false;
+    if (!Array.isArray(s.story) || !s.story.every((e) => e && typeof e === 'object' && typeof e.m === 'number' && isFinite(e.m) && typeof e.k === 'string')) return false;
     const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt'];
     const num = (v) => typeof v === 'number' && isFinite(v);
     if (!nums.every((k) => num(s[k]))) return false;
@@ -1123,13 +1124,16 @@
     const at = (m) => C.START_AGE + Math.floor(m / C.YEAR);
     const common = [['Должность', C.JOBS[S.job].name], ['Жильё', C.HOMES[S.home].name]].concat(S.trait ? [['Черта', C.TRAITS[S.trait].name]] : [], [['На счету', money(S.money)]]);
     const toPerks = { alt: 'Потратить опыт', altAction: () => { showTab('goals'); save(); } };
+    const ch = C.chronicle(S);
+    const story = `<blockquote class="epitaph">${esc(ch.epitaph)}</blockquote>`
+      + (ch.lines.length ? `<ol class="story">${ch.lines.map((l) => `<li class="${l.tone}"><b>${years(l.age)}</b><span>${esc(l.text)}</span></li>`).join('')}</ol>` : '');
     if (won) {
       sfx.big();
       confetti(70, true);
       openModal(Object.assign({
         art: ['coin', 'coin', 'coin'],
         title: `Миллион в ${years(at(S.wonAt))}`,
-        body: `<p>Жизнь закончена в ${years(C.age(S))}.</p>` + facts(common.concat([
+        body: `<p>Жизнь закончена в ${years(C.age(S))}.</p>` + story + facts(common.concat([
           ['Рекорд', paid.record ? (paid.prev == null ? 'первый миллион' : 'новый, прошлый был в ' + years(at(paid.prev))) : 'в ' + years(at(M.best))],
         ])) + goalsHtml + `<p>${bonus}</p>`,
         btn: 'Начать новую жизнь',
@@ -1139,7 +1143,7 @@
       openModal(Object.assign({
         art: ['hourglass'],
         title: '65 лет. Время вышло',
-        body: `<p>На счету ${money(S.money)}. До миллиона не хватило ${money(C.GOAL - S.money)}.</p>` + facts(common.slice(0, -1)) + goalsHtml + `<p>${bonus}</p>`,
+        body: `<p>На счету ${money(S.money)}. До миллиона не хватило ${money(C.GOAL - S.money)}.</p>` + story + facts(common.slice(0, -1)) + goalsHtml + `<p>${bonus}</p>`,
         btn: 'Начать новую жизнь',
         action: newLife,
       }, toPerks));

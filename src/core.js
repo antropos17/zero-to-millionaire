@@ -124,7 +124,7 @@ const Core = (() => {
   function newState(perks, life, rng) {
     const P = normPerks(perks), start = PERKS.cash.vals[P.cash];
     const s = {
-      v: 6,
+      v: 7,
       money: start, month: 0, job: 0, skill: 0, health: 100, network: PERKS.ties.vals[P.ties],
       home: 0, assets: 0,
       deck: Object.assign({}, START_DECK, { study: START_DECK.study + P.school, wild: P.joker }),
@@ -136,6 +136,7 @@ const Core = (() => {
       flags: { debt: false, low: false, yes: 0, gold: 0, sets: [], quad: false },
       perks: P, life: life || 1,
       status: 'playing', peak: start, wonAt: null, won: null, earned: 0,
+      story: [],
     };
     /* со второй жизни сначала выбирается черта */
     if (s.life > 1) {
@@ -180,6 +181,7 @@ const Core = (() => {
       s.won = s.wonAt != null && s.flags && s.deck ? snapWon(s) : null;
       delete s.legacy;
     }
+    if (s && s.v === 6) { s.v = 7; s.story = []; }
     return s;
   }
 
@@ -951,7 +953,14 @@ const Core = (() => {
     return { id: s.fork, title: f.title, text: f.text, options: [opt(f.a), opt(f.b)], gold: g ? opt(g) : null };
   }
 
+  /* Летопись: главные события жизни, из них в конце собирается эпитафия */
+  function note(s, k, o) {
+    if (!s.story) s.story = [];
+    if (s.story.length < 120) s.story.push(Object.assign({ m: s.month, k }, o));
+  }
+
   function track(s) {
+    if (s.money < 0 && !s.flags.debt) note(s, 'debt');
     if (s.money < 0) s.flags.debt = true;
     if (s.health < 50) s.flags.low = true;
   }
@@ -965,7 +974,7 @@ const Core = (() => {
     const o = isGold ? goldOption(s, id) : idx === 0 ? f.a : f.b;
     if (!o || (o.cost != null && s.money < o.cost)) return null;
     if (isGold) s._gold = true;
-    const before = s.money, h0 = s.health, sk = s.skill, nw = s.network, job0 = s.job, home0 = s.home;
+    const before = s.money, h0 = s.health, sk = s.skill, nw = s.network, job0 = s.job, home0 = s.home, as0 = s.assets;
     const d0 = Object.assign({}, s.deck);
     let out;
     try { out = o.run ? o.run(s, rng) : { text: f.title + ': отказ', tone: 'plain' }; } finally { delete s._gold; }
@@ -978,6 +987,10 @@ const Core = (() => {
     if (idx === 0 || isGold) s.flags.yes += 1;
     if (isGold) s.flags.gold += 1;
     const delta = s.money - before;
+    note(s, 'fork', { t: f.title, pick: isGold ? 'gold' : idx === 0 ? 'yes' : 'no', d: delta });
+    if (s.job > job0) note(s, 'job', { i: s.job });
+    if (s.home > home0) note(s, 'home', { i: s.home });
+    if (s.assets > as0) note(s, 'asset', { i: s.assets - 1 });
     if (delta > 0) s.earned += delta;
     if (s.money > s.peak) s.peak = s.money;
     track(s);
@@ -1070,6 +1083,7 @@ const Core = (() => {
         if (level(s, c.sym) > was) levelUps.push({ sym: c.sym, level: level(s, c.sym) });
       }
       if (c && c.count >= 4) s.flags.quad = true;
+      if (c && c.sym === 'chance' && c.count >= 3 && !(s.story || []).some((e) => e.k === 'jackpot')) note(s, 'jackpot');
       if (set && !s.flags.sets.includes(set.id)) s.flags.sets.push(set.id);
       parts.push(part);
     }
@@ -1109,7 +1123,7 @@ const Core = (() => {
   function check(s) {
     if (s.status !== 'playing') return false;
     let crossed = false;
-    if (s.wonAt == null && s.money >= GOAL) { s.wonAt = s.month; s.won = snapWon(s); crossed = true; }
+    if (s.wonAt == null && s.money >= GOAL) { s.wonAt = s.month; s.won = snapWon(s); crossed = true; note(s, 'million'); }
     if (s.month >= TOTAL) { s.status = s.wonAt != null ? 'won' : 'lost'; s.fork = null; }
     return crossed;
   }
@@ -1154,15 +1168,16 @@ const Core = (() => {
       if (!j || s.skill < j.skill) return false;
       s.job += 1;
       s.deck.work += 1;
+      note(s, 'job', { i: s.job });
       return true;
     }
     const cost = costOf(s, kind);
     if (cost == null || s.money < cost) return false;
     s.money -= cost;
     if (kind === 'gym') s.health = Math.min(100, s.health + 20);
-    else if (kind === 'home') s.home += 1;
-    else if (kind === 'asset') { s.assets += 1; s.deck.coin += 1; }
-    else if (kind === 'reel') s.reels4 = true;
+    else if (kind === 'home') { s.home += 1; note(s, 'home', { i: s.home }); }
+    else if (kind === 'asset') { s.assets += 1; s.deck.coin += 1; note(s, 'asset', { i: s.assets - 1 }); }
+    else if (kind === 'reel') { s.reels4 = true; note(s, 'reel'); }
     else if (kind.slice(0, 4) === 'add:') { const sym = kind.slice(4); s.deck[sym] += 1; s.bought[sym] += 1; }
     else if (kind.slice(0, 3) === 'up:') { s.up[kind.slice(3)] += 1; s.charge = Math.min(s.charge, chargeMax(s)); }
     else if (kind.slice(0, 4) === 'cut:') { const sym = kind.slice(4); s.deck[sym] -= 1; if (sym === 'bill') s.billsCut += 1; else s.cut += 1; }
@@ -1173,6 +1188,51 @@ const Core = (() => {
     if (s.status !== 'playing' || !FOCI.includes(f)) return false;
     s.focus = f;
     return true;
+  }
+
+  /* ---------- Летопись и эпитафия: итог жизни из записей s.story ---------- */
+  const JOB_GEN = ['раздатчика листовок', 'курьера', 'баристы', 'джуна', 'мидла', 'сеньора', 'тимлида', 'техдира стартапа', 'фаундера', 'владельца единорога'];
+  const ageAt = (m) => START_AGE + Math.floor(m / YEAR);
+  const signedUsd = (d) => (d < 0 ? '−⁠' : '+⁠') + usd(Math.abs(d));
+  function chronicle(s) {
+    const st = s.story || [], last = (k) => st.filter((e) => e.k === k).pop(), first = (k) => st.find((e) => e.k === k);
+    const forks = st.filter((e) => e.k === 'fork'), yes = forks.filter((e) => e.pick !== 'no');
+    const lastJob = JOBS.length - 1, lastHome = HOMES.length - 1;
+
+    /* заголовок окна уже говорит про миллион, эпитафия рассказывает, какой была жизнь */
+    const head = s.job === lastJob ? 'Владел единорогом'
+      : s.wonAt != null && s.job <= 2 ? `Разбогател в должности ${JOB_GEN[s.job]}`
+      : s.home === lastHome ? 'Дожил до виллы у моря'
+      : s.money < 0 ? 'Ушёл в минус'
+      : s.job === 0 ? 'Всю жизнь раздавал листовки'
+      : `Дорос до ${JOB_GEN[s.job]}`;
+    const twist = s.home === 0 ? 'но так и не съехал со скамейки'
+      : s.assets === 0 ? 'но ни разу ничего не вложил'
+      : s.health < 30 ? 'но здоровье оставил на работе'
+      : s.flags.debt && s.money >= 0 ? 'хотя однажды ушёл в минус'
+      : forks.length >= 3 && !yes.length ? 'отказываясь от всех авантюр'
+      : s.health >= 80 ? 'и до конца остался бодрячком'
+      : s.wonAt != null && !s.flags.gold ? 'и ни разу не взял золото'
+      : s.flags.yes >= 15 ? 'соглашаясь на всё подряд'
+      : 'и ни о чём не жалел';
+
+    const c = [];
+    const add = (e, w, text, tone) => { if (e) c.push({ m: e.m, w, text, tone }); };
+    add(first('million'), 100, 'Первый миллион', 'good');
+    const j = last('job'); if (j) add(j, 50, `Повышение: ${JOBS[j.i].name}`, 'good');
+    const h = last('home'); if (h) add(h, 40, `Переезд: ${HOMES[h.i].name}`, 'good');
+    const a = last('asset'); if (a) add(a, 35, `Вложился: ${ASSETS[a.i].name}`, 'good');
+    const best = yes.filter((e) => e.d > 0).sort((x, y) => y.d - x.d)[0];
+    const worst = forks.filter((e) => e.d < 0).sort((x, y) => x.d - y.d)[0];
+    if (best) add(best, 45, `${best.t}: ${signedUsd(best.d)}`, 'good');
+    if (worst) add(worst, 44, `${worst.t}: ${signedUsd(worst.d)}`, 'bad');
+    if (!best && !worst && yes.length) add(yes[0], 30, `${yes[0].t}: согласился`, 'plain');
+    add(first('jackpot'), 42, 'Джекпот: мем завирусился', 'good');
+    add(first('debt'), 38, 'Впервые ушёл в минус', 'bad');
+    add(first('reel'), 20, 'Купил четвёртый барабан', 'good');
+    const lines = c.sort((x, y) => y.w - x.w).slice(0, 5).sort((x, y) => x.m - y.m || y.w - x.w)
+      .map((x) => ({ age: ageAt(x.m), text: x.text, tone: x.tone }));
+    return { epitaph: `${head}, ${twist}.`, lines };
   }
 
   /* ---------- Цели на жизнь: каждая один раз даёт +1 опыта ---------- */
@@ -1215,7 +1275,7 @@ const Core = (() => {
     migrate, reelCount, level, effect, canCharge, chargedReels, deckSize, addCost, removeCost, pickTrait, forkAllowed,
     newState, age, monthsLeft, weights, odds, healthFactor, incomeMult, baseSalary, salary, luck, passive, assetIncome,
     healthDecay, rollReels, resolve, spin, expected, fork, choose, act, setFocus, check,
-    gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS,
+    gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS, chronicle,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;

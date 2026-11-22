@@ -84,7 +84,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.click('#menuPlay'); await p.waitForTimeout(500);
     const s = await st(p);
     const pts = await p.textContent('#ptsLine');
-    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 6 && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 7 && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
     if (name === 'v4') ok('сохранение v4: развилка на месте, три варианта', await p.locator('#forkLay').isVisible() && (await p.locator('#forkLay .opt:visible').count()) === 3);
     if (name === 'v5won') ok('сохранение v5 с победой: окно конца жизни, старый опыт стал очками', /^Миллион в/.test(await p.textContent('#modalTitle')) && /опыт: (\d+)$/.test(pts) && Number(pts.match(/(\d+)$/)[1]) >= 7 + 2, pts);
     await p.close();

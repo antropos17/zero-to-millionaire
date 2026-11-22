@@ -384,6 +384,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
   await p.waitForTimeout(300);
   ok('проигрыш: окно', (await p.textContent('#modalTitle')) === '65 лет. Время вышло');
+  ok('проигрыш: эпитафия в окне', /^[А-ЯЁ].+\.$/.test((await p.textContent('#modalBody .epitaph')) || ''), await p.textContent('#modalBody'));
   ok('проигрыш: в окне нет рекламы и покупок, только новая жизнь и опыт', (await p.locator('#overlay .modal button:visible').count()) === 2 && !/реклам/i.test(await p.textContent('#modalBox')) && (await p.textContent('#modalBody')).includes(`Опыт за эту жизнь: +${(await st(p)).paid.pts}`) && (await st(p)).paid.pts === 1 + (await st(p)).paid.goals.length, await p.textContent('#modalBody'));
   const pts0 = (await st(p)).paid.pts;
   await p.waitForTimeout(450); await p.click('#modalBtn');
@@ -416,6 +417,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.click('#retireBtn');
   await p.waitForTimeout(300);
   ok('пенсия: заголовок с возрастом миллиона', /^Миллион в 38 лет$/.test(await p.textContent('#modalTitle')), await p.textContent('#modalTitle'));
+  ok('пенсия: эпитафия и летопись с первым миллионом', /^[А-ЯЁ].+, .+\.$/.test(await p.textContent('#modalBody .epitaph')) && (await p.textContent('#modalBody .story')).includes('Первый миллион'), await p.textContent('#modalBody'));
   const met1 = await p.evaluate(() => Core.goalsMet(window.z2m.state()));
   const paid1 = (await st(p)).paid;
   const ptsA = pts0 - 1 + paid1.pts;
@@ -471,7 +473,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, KEY);
   await p.reload(); await enter(p);
   s = await st(p);
-  ok('старое сохранение продолжилось с колодой', s.v === 6 && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
+  ok('старое сохранение продолжилось с колодой', s.v === 7 && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
   await p.close();
 
   /* 10. Хранилище запрещено */
