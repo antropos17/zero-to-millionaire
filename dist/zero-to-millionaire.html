@@ -3710,10 +3710,8 @@ const Art = (() => {
     /* место под кнопку занято всегда: до миллиона она выключена, после конца жизни её сменяет «Начать новую жизнь» */
     $('nextBtn').hidden = !over;
     $('retireBtn').hidden = over;
-    /* кнопка появляется вместе с окном миллиона или конца жизни: сдвиг вкладки происходит под окном и игроку не виден */
-    $('lifeBtns').hidden = !over && s.wonAt == null;
-    $('retireBtn').disabled = false;
-    $('retireBtn').textContent = 'Выйти на пенсию';
+    $('retireBtn').disabled = s.wonAt == null;
+    $('retireBtn').textContent = s.wonAt == null ? 'Пенсия после миллиона' : 'Выйти на пенсию';
     const t = s.trait ? C.TRAITS[s.trait] : null;
     $('traitLine').hidden = !t;
     $('traitLine').innerHTML = t ? `<img src="${ICON[TRAIT_ICON[s.trait]]}" alt=""><div><b>Черта этой жизни: ${esc(t.name)}</b><span>${esc(t.note)}</span></div>` : '';

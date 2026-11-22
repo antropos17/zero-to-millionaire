@@ -406,6 +406,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.locator('li[data-kind="perk-cash"] .btn-buy').click();
   const mt1 = await meta(p);
   ok('куплен «Семейный капитал»: опыт потрачен, действует со следующей жизни', mt1.pts === pts0 - 1 && mt1.perks.cash === 1 && (await st(p)).money === 0 && (await p.evaluate((pk) => Core.newState(pk).money, mt1.perks)) === 500 && /Ур\. 2 из 4/.test(await p.textContent('li[data-kind="perk-cash"] p')), JSON.stringify(mt1.perks));
+  ok('до миллиона кнопка пенсии уже на месте, но выключена: вкладка не прыгает в момент миллиона', (await st(p)).wonAt == null && await p.locator('#retireBtn').isVisible() && await p.locator('#retireBtn').isDisabled() && (await p.textContent('#retireBtn')) === 'Пенсия после миллиона');
   await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1200000; t.month = 12 * 20; t.job = 6; window.z2m.skip(1); });
   await p.waitForTimeout(300);
   ok('миллион жизнь не заканчивает: окно с выбором', (await p.textContent('#modalTitle')) === 'Первый миллион!' && (await st(p)).status === 'playing' && (await st(p)).wonAt === 241 && (await p.locator('#overlay .modal button:visible').count()) === 2);
