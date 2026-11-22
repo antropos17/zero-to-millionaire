@@ -146,6 +146,8 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('переезд в хостел', (await st(p)).home === 1 && (await st(p)).money === 0);
   await set(p, { money: 99999 });
   ok('значок на вкладке считает доступные покупки', Number(await p.textContent('#shopBadge')) >= 3, await p.textContent('#shopBadge'));
+  const groups = await p.evaluate(() => Array.from(document.querySelectorAll('#shop > h3.sub')).map((h) => h.textContent + ':' + Array.from(h.nextElementSibling.querySelectorAll('li')).map((li) => li.dataset.kind).join(',')).join(' | '));
+  ok('покупки разложены по разделам в нужном порядке', groups === 'Бонусы:boost | Жизнь:job,gym,home | Капитал:asset | Слот:reel,up-mult,up-star,up-insure,up-coach', groups);
   /* пара монет платит пассивный доход за 6 месяцев: работа до .4, учёба .5, здоровье .6, связи .667, шанс .767, монета .867 */
   await fix(p, { money: 100, assets: 1, deck: Object.assign({}, D0, { coin: 3 }) });
   const c0 = await p.evaluate(() => { const s = window.z2m.state(); return { money: s.money, sal: Core.salary(s), pas: Core.passive(s) }; });
