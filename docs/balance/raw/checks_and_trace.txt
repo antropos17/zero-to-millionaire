@@ -1,0 +1,42 @@
+фокус work  барабанов 3 карт 24  любое событие 62.9% (перебор 62.9%)
+фокус study барабанов 3 карт 28  любое событие 60.1% (перебор 60.1%)
+фокус work  барабанов 4 карт 24  любое событие 92.2% (перебор 92.3%)
+фокус study барабанов 4 карт 28  любое событие 90.2% (перебор 90.2%)
+средний доход: формула 2406.2, симуляция 2399.9
+развилок всего 44, недоступных ни разу: нет
+--- smart опыт=0 -> won в 65
+22: $290 job1 skill18 hp59 net5 home1 assets3 4б=0 колода 7/5/3/2/4/3/4/0 sal128 pas158 focus=study
+26: $16921 job2 skill40 hp66 net6 home1 assets3 4б=0 колода 8/5/3/2/5/3/4/0 sal178 pas158 focus=study
+30: $41391 job2 skill67 hp61 net6 home1 assets4 4б=0 колода 8/6/3/2/5/4/4/0 sal212 pas563 focus=study
+34: $80504 job3 skill109 hp60 net13 home2 assets5 4б=0 колода 9/8/4/2/6/5/3/0 sal448 pas1728 focus=study
+38: $51500 job5 skill219 hp99 net19 home2 assets6 4б=1 колода 11/12/5/2/7/6/2/1 sal1538 pas4638 focus=study
+42: $1294489 job7 skill383 hp55 net26 home3 assets7 4б=1 колода 13/14/6/2/9/7/1/1 sal5189 pas10878 focus=work
+46: $6249055 job8 skill453 hp59 net50 home3 assets7 4б=1 колода 14/14/6/2/9/7/1/1 sal9397 pas10878 focus=work
+50: $9478282 job9 skill557 hp80 net70 home3 assets7 4б=1 колода 15/14/6/2/9/7/1/1 sal15195 pas10878 focus=work
+54: $15598222 job9 skill587 hp61 net77 home3 assets7 4б=1 колода 15/14/6/2/9/7/1/1 sal15889 pas10878 focus=work
+58: $21827393 job9 skill637 hp83 net87 home3 assets7 4б=1 колода 15/14/6/2/9/7/1/1 sal17045 pas10878 focus=work
+62: $44488471 job9 skill683 hp59 net101 home3 assets7 4б=1 колода 15/14/6/2/9/7/1/1 sal18109 pas10878 focus=work
+--- casual опыт=0 -> won в 65
+22: $2207 job1 skill17 hp48 net3 home1 assets2 4б=0 колода 7/6/3/2/4/2/3/0 sal92 pas38 focus=study
+26: $3827 job2 skill57 hp55 net7 home2 assets2 4б=0 колода 8/8/3/2/4/2/3/0 sal214 pas38 focus=study
+30: $14391 job3 skill97 hp41 net12 home2 assets3 4б=0 колода 9/9/3/2/5/3/3/0 sal313 pas158 focus=study
+34: $22799 job4 skill156 hp56 net14 home3 assets3 4б=0 колода 10/9/4/2/5/3/2/0 sal841 pas158 focus=study
+38: $47289 job5 skill202 hp46 net15 home3 assets4 4б=0 колода 11/9/4/2/5/4/2/1 sal1097 pas563 focus=study
+42: $111223 job5 skill238 hp52 net16 home3 assets4 4б=0 колода 11/9/4/2/7/4/1/1 sal1657 pas563 focus=work
+46: $334085 job6 skill245 hp92 net18 home4 assets6 4б=1 колода 12/9/4/2/8/6/1/2 sal2554 pas4638 focus=work
+50: $1144644 job6 skill283 hp63 net31 home5 assets6 4б=1 колода 12/9/4/2/9/6/1/2 sal3428 pas4638 focus=work
+54: $2191634 job6 skill311 hp80 net39 home5 assets6 4б=1 колода 12/9/4/2/9/6/1/2 sal3980 pas4638 focus=work
+58: $4495949 job7 skill335 hp42 net47 home5 assets6 4б=1 колода 13/9/4/2/9/6/1/2 sal4445 pas4638 focus=work
+62: $6388888 job7 skill370 hp86 net51 home5 assets6 4б=1 колода 13/9/4/2/9/6/1/2 sal6403 pas4638 focus=work
+--- lazy опыт=0 -> lost в 65
+22: $7426 job0 skill6 hp60 net3 home0 assets0 4б=0 колода 6/3/3/2/4/0/4/0 sal89 pas0 focus=work
+26: $13602 job1 skill10 hp0 net3 home0 assets0 4б=0 колода 7/3/3/2/5/0/4/0 sal0 pas0 focus=work
+30: $17974 job1 skill17 hp6 net8 home0 assets0 4б=0 колода 7/3/3/2/5/0/4/0 sal62 pas0 focus=work
+34: $28214 job1 skill19 hp0 net11 home0 assets0 4б=0 колода 7/3/3/2/5/0/4/0 sal0 pas0 focus=work
+38: $38590 job1 skill20 hp0 net11 home0 assets0 4б=0 колода 7/3/3/2/5/0/4/0 sal0 pas0 focus=work
+42: $48572 job1 skill21 hp0 net13 home0 assets0 4б=0 колода 7/3/3/2/5/0/4/0 sal0 pas0 focus=work
+46: $52698 job1 skill26 hp0 net14 home0 assets0 4б=0 колода 7/3/3/2/6/0/4/0 sal0 pas0 focus=work
+50: $65463 job1 skill28 hp0 net19 home0 assets0 4б=0 колода 7/3/3/2/6/0/4/0 sal0 pas0 focus=work
+54: $73909 job1 skill33 hp4 net21 home0 assets0 4б=0 колода 7/3/3/2/6/0/4/0 sal83 pas0 focus=work
+58: $84353 job2 skill35 hp0 net22 home0 assets0 4б=0 колода 8/3/3/2/6/0/4/0 sal0 pas0 focus=work
+62: $100096 job2 skill42 hp0 net26 home0 assets0 4б=0 колода 8/3/3/2/7/0/4/0 sal0 pas0 focus=work
