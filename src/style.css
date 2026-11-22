@@ -460,6 +460,16 @@ img, svg { display: block; }
 #deck li.on h3 { color: var(--blue); }
 .sub { font-family: var(--display); font-weight: 700; font-size: 13px; margin-top: 16px; padding-top: 12px; border-top: 2px solid var(--paper-2); }
 
+/* Покупки по разделам: заголовки в стиле .sub, но плотнее, чтобы не съесть первый экран */
+.shop-groups .sub { margin-top: 12px; padding-top: 8px; line-height: 16px; }
+.shop-groups .sub:first-child { margin-top: 6px; padding-top: 0; border-top: 0; }
+.shop-groups .shop { padding-top: 6px; }
+@media (max-height: 700px) and (max-width: 919px) {
+  .shop-groups .sub { margin-top: 6px; padding-top: 4px; font-size: 12px; line-height: 14px; }
+  .shop-groups .sub:first-child { margin-top: 0; padding-top: 0; }
+  .shop-groups .shop { padding-top: 3px; }
+}
+
 /* Цели и черта */
 .trait-line { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-top: 8px; padding: 9px 11px; background: var(--paper-2); border-radius: 12px; min-height: 56px; }
 .trait-line img { width: 34px; height: 34px; }
