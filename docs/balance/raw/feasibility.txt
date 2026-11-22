@@ -1,0 +1,9 @@
+без инвестиций побед 100% возраст med 65 {"m50":177,"noinvest":200,"nodebt":199,"healthy":142,"nogold":200,"villa":200,"unicorn":200,"quad":200,"w1":200}
+без барабана   побед 100% возраст med 65 {"noreel":200,"nodebt":199,"healthy":141,"nogold":200,"villa":200,"unicorn":200,"w1":163,"sets":118}
+тонкая колода  побед 100% возраст med 65 {"noinvest":200,"nodebt":199,"thin":200,"nogold":200,"villa":200,"quad":200,"healthy":160,"w1":91,"m50":1}
+три уровня     побед 90% возраст med 65 {"levels":200,"villa":200,"sets":191,"quad":198,"nodebt":179,"healthy":134,"nogold":180,"unicorn":170}
+всё подряд     побед 100% возраст med 65 {"nodebt":199,"healthy":142,"nogold":200,"villa":200,"unicorn":200,"quad":200,"w1":200,"sets":171,"m50":75}
+без учёбы-карт побед 100% возраст med 65 {"nodebt":199,"nogold":200,"villa":200,"sets":200,"quad":192,"healthy":105}
+без дома       побед 100% возраст med 65 {"nodebt":199,"healthy":138,"nogold":200,"unicorn":200,"sets":176,"quad":200,"w1":200,"m50":83}
+с множителем   побед 100% возраст med 65 {"m50":186,"nodebt":199,"healthy":155,"nogold":200,"villa":165,"unicorn":200,"sets":174,"quad":200,"w1":200,"w2":127}
+все улучшения  побед 100% возраст med 65 {"m50":164,"nodebt":199,"healthy":155,"nogold":200,"villa":165,"unicorn":200,"sets":166,"quad":200,"w1":200,"w2":89}
