@@ -5,6 +5,7 @@
   "description": "Idle-игра: слот крутит месяцы жизни, цель — миллион до 65. Собирается в один самодостаточный HTML.",
   "scripts": {
     "build": "node scripts/build.js",
+    "sounds": "node scripts/sounds.js",
     "test": "npm run build && node tests/e2e.js dist/zero-to-millionaire.html",
     "test:edges": "npm run build && node tests/edges.js dist/zero-to-millionaire.html",
     "test:forks": "npm run build && node tests/forks.js dist/zero-to-millionaire.html",
