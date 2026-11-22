@@ -25,7 +25,7 @@
     },
   };
 
-  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {} });
+  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], theme: 'base' });
   let S = C.newState(null, 1);
   let M = freshMeta();
 
@@ -56,7 +56,9 @@
   }
   /* пока игрок в меню после загрузки, время сохранения не трогаем: иначе пропал бы доход за отсутствие */
   let entered = false, bootT = null, away = 0;
-  const save = () => store.set({ S, M, t: entered || bootT == null ? Date.now() : bootT });
+  /* до первого входа в игру жизни ещё нет: покупка в магазине или настройка в меню сохраняют только метаданные,
+     иначе пустая жизнь сохранилась бы и при следующем запуске «прокрутилась» за время отсутствия */
+  const save = () => store.set({ S: entered || hasSave ? S : null, M, t: entered || bootT == null ? Date.now() : bootT });
 
   /* ---------- Формат ---------- */
   const nf = new Intl.NumberFormat('ru-RU');
@@ -381,9 +383,10 @@
   let traitOpen = false;
   let adOpen = false;
   let menuOpen = true;
+  let storeOpen = false;
   const spinMs = () => 1000 / M.speed;
   const holdMs = () => 800 / M.speed;
-  const blocked = () => menuOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
+  const blocked = () => menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
 
   /* chargedSym: символ «Своего месяца», если игрок потратил звезду */
   function startSpin(chargedSym) {
@@ -503,7 +506,7 @@
 
   /* ---------- Развилки ---------- */
   function openFork() {
-    if (menuOpen) return;
+    if (menuOpen || storeOpen) return;
     const f = C.fork(S);
     if (!f) { schedule(); return; }
     forkOpen = true;
@@ -520,6 +523,7 @@
     const g = $('forkG');
     g.hidden = !f.gold;
     if (f.gold) {
+      g.children[0].textContent = ownsNoAds() ? 'Золотой: без рекламы' : 'Золотой: за рекламу';
       g.children[1].textContent = f.gold.label;
       g.children[2].textContent = f.gold.enabled ? f.gold.note : 'Не хватает денег';
       g.disabled = !f.gold.enabled;
@@ -560,9 +564,17 @@
     openedAt = Date.now();
     if (forkOpen) $('forkBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
   }
+  /* Купленное «Без рекламы» отдаёт тот же бонус сразу, без ролика: суммы и ограничения не меняются */
+  function ownsNoAds() { return C.noAds(M.owned); }
+  function withAd(onDone) {
+    if (adOpen) return;
+    if (!ownsNoAds()) { openAd(onDone); return; }
+    clearTimeout(timer);
+    onDone();
+  }
   function chooseFork(idx) {
     if (!forkOpen || adOpen || Date.now() - openedAt < GUARD) return;
-    if (idx === 'gold') openAd(() => applyFork('gold')); else applyFork(idx);
+    if (idx === 'gold') withAd(() => applyFork('gold')); else applyFork(idx);
   }
   function applyFork(idx) {
     if (!forkOpen) return;
@@ -635,7 +647,7 @@
   const FLOAT = { job: () => 'Повышение!', home: () => 'Новоселье!', asset: () => `+${money(C.assetIncome(S, S.assets - 1))} в мес.`, gym: () => 'здоровье +20', reel: () => 'Четыре барабана!' };
   function useBoost(li) {
     if (!C.boostReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
-    openAd(() => {
+    withAd(() => {
       if (!C.startBoost(S)) { schedule(); return; }
       sfx.big(); charAct('jump'); confetti(20, false);
       pushLog(`Удачный год: ${C.BOOST_LEN} месяцев все доходы вдвое`, null, 'star');
@@ -727,7 +739,7 @@
     setRow(shopRows.boost, s.boost > 0
       ? { title: 'Удачный год идёт', desc: 'Зарплата, пассив и деньги хороших событий вдвое.', verb: 'Идёт', price: `ещё ${s.boost} мес.`, done: true, progress: 1 }
       : C.boostReady(s)
-        ? { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: 'Смотреть', price: 'рекламу', enabled: true }
+        ? { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true }
         : { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: 'Отдых', price: open ? `ещё ${Math.max(0, s.boostAt - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, s.boostAt - s.month) / C.BOOST_REST : 0 });
 
     const nj = C.nextJob(s);
@@ -997,6 +1009,9 @@
     cb.classList.toggle('ready', ready);
     cb.setAttribute('aria-label', ready ? 'Свой месяц готов: выбрать символ' : `Свой месяц: заряд ${s.charge} из ${C.chargeMax(s)}, копится в пустые месяцы`);
     cb.title = cb.getAttribute('aria-label');
+    /* в конце жизни входа в магазин нет: кнопка прячется без сдвига соседей */
+    $('storeBtn').style.visibility = s.status === 'playing' ? '' : 'hidden';
+    $('storeBtn').disabled = s.status !== 'playing';
     document.querySelector('.slot').classList.toggle('four', s.reels4);
     document.querySelector('.slot').classList.toggle('has-mult', s.up.mult > 0);
 
@@ -1072,7 +1087,7 @@
 
   /* Первый миллион: жизнь продолжается, выбор за игроком */
   function maybeMillion() {
-    if (menuOpen || S.status !== 'playing' || S.wonAt == null || S.asked) return false;
+    if (menuOpen || storeOpen || S.status !== 'playing' || S.wonAt == null || S.asked) return false;
     S.asked = true;
     save();
     const at = C.START_AGE + Math.floor(S.wonAt / C.YEAR);
@@ -1096,7 +1111,7 @@
   }
 
   function endLife() {
-    if (menuOpen) return;
+    if (menuOpen || storeOpen) return;
     clearTimeout(timer);
     forkOpen = false;
     $('forkLay').hidden = true;
@@ -1162,7 +1177,7 @@
 
   /* ---------- Черта: одна из трёх на старте жизни ---------- */
   function openTrait() {
-    if (!S.traitOptions || menuOpen) return;
+    if (!S.traitOptions || menuOpen || storeOpen) return;
     traitOpen = true;
     clearTimeout(timer);
     $('traitIcon').src = ICON.star;
@@ -1205,9 +1220,9 @@
       btn: 'Продолжить',
       action: () => { if (!maybeMillion()) schedule(); },
     }, got > 0 ? {
-      alt: `Удвоить за рекламу: ещё ${signed(got)}`,
+      alt: ownsNoAds() ? `Удвоить: ещё ${signed(got)}` : `Удвоить за рекламу: ещё ${signed(got)}`,
       altKeeps: true,
-      altAction: () => openAd(() => {
+      altAction: () => withAd(() => {
         S.money += got; S.earned += got;
         if (S.money > S.peak) S.peak = S.money;
         C.check(S);
@@ -1238,7 +1253,7 @@
     render(); save();
     if (M.sound) sfx.good();
   });
-  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen) showHelp(); });
+  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !storeOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen) showHelp(); });
   document.querySelector('.focus').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-focus]');
     if (b) setFocus(b.dataset.focus);
@@ -1282,7 +1297,7 @@
     anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false;
     $('chargeLay').hidden = true; $('traitLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
     store.clear();
-    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed };
+    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, theme: M.theme };
     S = C.newState(null, 1);
     M = Object.assign(freshMeta(), keep);
     hideModal();
@@ -1323,6 +1338,7 @@
     $('menuAuto').textContent = M.auto ? 'Авто: вкл' : 'Авто: выкл';
     $('menuAuto').setAttribute('aria-pressed', String(M.auto));
     $('menuSpeed').textContent = `Скорость ×${M.speed}`;
+    $('menuThanks').hidden = !M.owned.includes('thanks');
   }
   function showMenu() {
     menuOpen = true;
@@ -1332,7 +1348,7 @@
     $('menuBox').focus();
   }
   function openMenu() {
-    if (menuOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
     if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
     save();
     showMenu();
@@ -1361,6 +1377,144 @@
   $('menuSound').addEventListener('click', () => { $('soundBtn').click(); renderMenu(); });
   $('menuAuto').addEventListener('click', () => { $('autoBtn').click(); renderMenu(); });
   $('menuSpeed').addEventListener('click', () => { $('speedBtn').click(); renderMenu(); });
+
+  /* ---------- Оплата: тонкий переходник к площадке ----------
+     Контракт (его же описывает docs/DESIGN.md, раздел «Магазин»):
+     Pay.price(id)  → строка цены для показа на кнопке («тест» в заглушке, «149 ₽» у площадки).
+     Pay.buy(id)    → Promise<'bought' | 'cancelled' | 'error'>. Записывает купленное игра, не переходник.
+     Pay.restore()  → Promise<string[]>: id разовых товаров, купленных на этом аккаунте; ошибка связи — reject.
+     Настоящая оплата (Telegram, App Store, Google Play) меняет только внутренности этого объекта.
+     Сейчас внутри заглушка: окно «Тестовая покупка. Деньги не списываются».
+     Для тестов: window.z2m.pay = 'bought' | 'cancelled' | 'error' отвечает сразу без окна,
+     window.z2m.payRestore = [id, …] — что «вернёт» восстановление. */
+  let payOpen = false;
+  const Pay = (() => {
+    let done = null;
+    function finish(r) {
+      if (!done) return;
+      const fn = done;
+      done = null; payOpen = false;
+      $('payLay').hidden = true;
+      $('storeBox').focus();
+      fn(r);
+    }
+    $('payOk').addEventListener('click', () => finish('bought'));
+    $('payCancel').addEventListener('click', () => finish('cancelled'));
+    return {
+      price: () => 'тест',
+      buy(id) {
+        const auto = window.z2m && window.z2m.pay;
+        if (auto) return Promise.resolve(auto);
+        if (done || !C.STORE[id]) return Promise.resolve('error');
+        return new Promise((res) => {
+          done = res; payOpen = true;
+          $('payTitle').textContent = C.STORE[id].name;
+          $('payText').textContent = C.STORE[id].note + '.';
+          $('payPrice').textContent = Pay.price(id);
+          $('payLay').hidden = false;
+          $('payBox').focus();
+        });
+      },
+      restore() {
+        const list = window.z2m && Array.isArray(window.z2m.payRestore) ? window.z2m.payRestore.slice() : [];
+        return Promise.resolve(list);
+      },
+    };
+  })();
+
+  /* ---------- Магазин: окно поверх игры и меню ---------- */
+  function applyTheme() {
+    M.theme = C.normTheme(M.theme, M.owned);
+    const root = document.documentElement;
+    if (M.theme === C.THEME_BASE) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', M.theme);
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', getComputedStyle(root).getPropertyValue('--blue').trim() || '#2B45D4');
+  }
+  let storeFrom = 'menu';
+  const storeNote = (t) => { $('storeNote').textContent = t || ''; };
+  function themeBtn(theme) {
+    const on = M.theme === theme;
+    return `<button class="btn btn-buy" type="button" data-pick="${theme}"${on ? ' disabled' : ''}><b>${on ? 'Выбрано' : 'Выбрать'}</b></button>`;
+  }
+  function storeRow(id, name, note, btn) {
+    return `<li data-item="${id}"><div><b class="st-name">${esc(name)}</b><span class="st-note">${esc(note)}</span></div>${btn}</li>`;
+  }
+  function renderStore() {
+    $('storeShelves').innerHTML = C.STORE_SHELVES.map((sh) => {
+      const rows = C.STORE_IDS.filter((id) => C.STORE[id].shelf === sh.id).map((id) => {
+        const it = C.STORE[id], has = M.owned.includes(id);
+        const btn = has && it.theme ? themeBtn(it.theme)
+          : has ? '<button class="btn btn-buy" type="button" disabled><b>Куплено</b></button>'
+            : `<button class="btn btn-buy" type="button" data-buy="${id}"><b>Купить</b><span>${esc(Pay.price(id))}</span></button>`;
+        return storeRow(id, it.name, it.note, btn);
+      });
+      if (sh.id === 'look') rows.unshift(storeRow('theme-base', 'Стандартная тема', 'Синяя, как с самого начала. Доступна всегда', themeBtn(C.THEME_BASE)));
+      return `<section class="store-shelf"><h3>${esc(sh.name)}</h3><ul>${rows.join('')}</ul></section>`;
+    }).join('');
+  }
+  function openStore() {
+    if (storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (!menuOpen && S.status !== 'playing') return;
+    storeFrom = menuOpen ? 'menu' : 'game';
+    clearTimeout(timer);
+    if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
+    storeOpen = true;
+    storeNote('');
+    renderStore();
+    $('storeLay').hidden = false;
+    $('storeBox').focus();
+  }
+  function closeStore() {
+    if (!storeOpen || payOpen) return;
+    storeOpen = false;
+    $('storeLay').hidden = true;
+    save();
+    if (storeFrom === 'menu') { renderMenu(); $('menuBox').focus(); return; }
+    if (S.status !== 'playing') { endLife(); return; }
+    if (maybeMillion()) return;
+    const gone = away;
+    away = 0;
+    if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else if (!catchUp(gone)) schedule(300);
+  }
+  function storeBuy(id) {
+    if (payOpen || !C.STORE[id] || M.owned.includes(id)) return;
+    storeNote('');
+    Pay.buy(id).then((res) => {
+      if (res === 'bought') {
+        M.owned = C.normOwned(M.owned.concat(id));
+        storeNote(`Куплено: ${C.STORE[id].name}`);
+        render(); save();
+      } else if (res === 'error') storeNote('Покупка не прошла. Деньги не списаны');
+      if (storeOpen) renderStore();
+    }, () => { storeNote('Покупка не прошла. Деньги не списаны'); });
+  }
+  function storePick(theme) {
+    if (!C.ownsTheme(M.owned, theme)) return;
+    M.theme = theme;
+    applyTheme();
+    save();
+    renderStore();
+  }
+  function storeRestore() {
+    if (payOpen) return;
+    Pay.restore().then((list) => {
+      const add = C.normOwned(list).filter((id) => C.STORE[id].once && !M.owned.includes(id));
+      M.owned = C.normOwned(M.owned.concat(add));
+      storeNote(add.length ? `Восстановлено: ${add.map((id) => C.STORE[id].name).join(', ')}` : 'Новых покупок не найдено');
+      render(); save();
+      if (storeOpen) renderStore();
+    }, () => { storeNote('Не удалось связаться с магазином. Попробуй позже'); });
+  }
+  $('storeBtn').addEventListener('click', openStore);
+  $('menuStore').addEventListener('click', () => { if (!modalOpen) openStore(); });
+  $('storeClose').addEventListener('click', closeStore);
+  $('storeLay').addEventListener('click', (e) => { if (e.target === $('storeLay')) closeStore(); });
+  $('storeRestore').addEventListener('click', storeRestore);
+  $('storeShelves').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    if (b.dataset.buy) storeBuy(b.dataset.buy); else if (b.dataset.pick) storePick(b.dataset.pick);
+  });
 
   /* ---------- Загрузка: ждём шрифты и картинки, полоска показывает настоящую долю готового ---------- */
   function boot() {
@@ -1405,7 +1559,7 @@
     } else {
       const gone = hiddenAt ? Date.now() - hiddenAt : 0;
       hiddenAt = null;
-      if (menuOpen) { if (entered) away += gone; }
+      if (menuOpen || storeOpen) { if (entered) away += gone; }
       else if (!modalOpen && !forkOpen && !chargeOpen && !traitOpen && !catchUp(gone)) schedule();
     }
   });
@@ -1427,7 +1581,10 @@
     M.goals = Array.from(new Set(M.goals.filter((id) => C.GOALS.some((g) => g.id === id))));
     M.sound = M.sound === true; M.auto = M.auto !== false; M.seenHelp = M.seenHelp === true;
     M.perks = C.normPerks(M.perks);
+    M.owned = C.normOwned(M.owned);
+    M.theme = C.normTheme(M.theme, M.owned);
   }
+  applyTheme();
   /* опыт из прошлых версий был процентом к доходу: теперь это очки, которые можно потратить */
   const oldPts = saved && saved.S && saved.S.v < 6 && typeof saved.S.legacy === 'number' && isFinite(saved.S.legacy) ? Math.max(0, Math.round(saved.S.legacy)) : 0;
   if (saved && validState(C.migrate(saved.S))) {
@@ -1449,6 +1606,8 @@
   /* Для тестов прототипа из консоли: z2m.skip(120) проматывает десять лет без покупок и развилок */
   window.z2m = {
     adMs: null,
+    pay: null,
+    payRestore: null,
     state: () => S,
     refresh: () => { render(); save(); },
     skip(n) {
