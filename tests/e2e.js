@@ -619,7 +619,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn');
   await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
   const boxes = () => p.evaluate(() => ['.stage', '.scene-wrap', '.hud', '.slot', '.desk', '.tabs', '.ctrl', '#spinBtn', '#money', '.chips', '.focus', '#reels', '#storeBtn']
-    .concat(Array.from(document.querySelectorAll('#shop li')).map((_, i) => `#shop li:nth-child(${i + 1})`))
+    .concat(Array.from(document.querySelectorAll('#shop li')).map((li) => `#shop li[data-kind="${li.dataset.kind}"]`))
     .map((q) => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(':'); }).join('|'));
   await p.waitForTimeout(400);
   const bx0 = await boxes(), col0 = await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor);
@@ -650,19 +650,20 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
     await q.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
     await q.evaluate(() => { const s = window.z2m.state(); Object.assign(s, { fork: 'startup', money: 10000, health: 70, month: 60, boost: 0, boostAt: 0 }); window.z2m.refresh(); });
     await q.reload(); await enter(q);
-    await q.evaluate(() => { window.z2m.adMs = 60; });
+    /* заглушка рекламы идёт 600 мс: окно успеваем застать и на загруженной машине; после замера ждём её конца */
+    await q.evaluate(() => { window.z2m.adMs = 600; });
     const label = await q.textContent('#forkG i');
     await q.waitForTimeout(450);
     await force(q, [0.42, 0.42, 0.42, 0.42]);
     await q.click('#forkG');
     const adShown = await q.locator('#adLay').isVisible();
-    await q.waitForTimeout(400);
+    await q.waitForTimeout(1000);
     const afterFork = JSON.stringify(await st(q));
     await q.click('#tabBtn-shop');
     const bl = await q.textContent('li[data-kind="boost"] .btn-buy');
     await q.locator('li[data-kind="boost"] .btn-buy').click();
     const adShown2 = await q.locator('#adLay').isVisible();
-    await q.waitForTimeout(400);
+    await q.waitForTimeout(1000);
     await force(q, [0.1, 0.5, 0.6, 0.5, 0.5, 0.5, 0.5, 0.5]);
     await q.evaluate(() => window.z2m.skip(1));
     const res = { label, bl, adShown, adShown2, afterFork, afterBoost: JSON.stringify(await st(q)) };

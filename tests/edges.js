@@ -153,6 +153,9 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   }));
   ok('сто миллионов на телефоне 360: деньги и подпись не наезжают, плашки целые', big.over <= 0 && big.line <= 0 && big.moneyRight <= big.goalLeft && big.goalRight <= 360 && big.chips.length === 0, JSON.stringify(big));
   /* конец жизни с десятью новыми целями на маленьком телефоне: кнопки окна должны быть на виду без прокрутки */
+  /* спин, начатый до выключения авто, мог открыть развилку: её окно легло бы поверх окна миллиона. Дожидаемся его и отказываемся */
+  await p.waitForTimeout(1500);
+  if (await p.locator('#forkLay').isVisible()) { await p.click('#forkB'); await p.waitForTimeout(500); }
   await p.evaluate(() => { const s = window.z2m.state(); Object.assign(s, { money: 1200000, peak: 1200000, month: 30, wonAt: null, won: null, asked: false, boost: 0, assets: 0, reels4: false }); s.deck.coin = 0; s.flags = { debt: false, low: false, yes: 0, gold: 0, sets: [], quad: false }; window.z2m.skip(1); });
   await p.waitForTimeout(900); await p.click('#modalAlt'); await p.waitForTimeout(600);
   const endm = await p.evaluate(() => { const hit = (id) => { const b = document.getElementById(id), r = b.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return r.bottom <= innerHeight && !!t && (t === b || b.contains(t)); }; return { goals: document.querySelectorAll('#modalBody .goals li').length, btn: hit('modalBtn'), alt: hit('modalAlt'), bodyScrolls: document.getElementById('modalBody').scrollHeight > document.getElementById('modalBody').clientHeight }; });
