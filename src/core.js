@@ -44,6 +44,29 @@ const Core = (() => {
   };
   const PERK_IDS = Object.keys(PERKS);
   const normPerks = (perks) => { const P = {}; PERK_IDS.forEach((id) => { P[id] = Math.max(0, Math.min(PERKS[id].costs.length, (perks && perks[id]) | 0)); }); return P; };
+  /* Магазин за настоящие деньги: только удобство, внешний вид и поддержка автора. Силу не продаём:
+     ни денег в игре, ни наследия, ни шансов. Цены здесь нет, её отдаёт оплата площадки (ui.js, Pay).
+     shelf: полка; once: разовая покупка (восстанавливается); theme: какую тему открывает товар */
+  const STORE_SHELVES = [
+    { id: 'noads', name: 'Без рекламы' },
+    { id: 'look', name: 'Внешний вид' },
+    { id: 'support', name: 'Поддержать автора' },
+  ];
+  const STORE = {
+    noads: { shelf: 'noads', name: 'Без рекламы', note: 'Бонусы за рекламу сразу, без ролика. Сами бонусы и их ограничения те же', once: true },
+    'theme-bill': { shelf: 'look', name: 'Тема «Зелёная купюра»', note: 'Цвета интерфейса: зелёный и тёмно-зелёный', once: true, theme: 'bill' },
+    'theme-dusk': { shelf: 'look', name: 'Тема «Вечер на вилле»', note: 'Цвета интерфейса: фиолетовый и сливовый', once: true, theme: 'dusk' },
+    thanks: { shelf: 'support', name: 'Спасибо автору', note: 'Ничего не меняет в игре. В меню появится отметка благодарности', once: true },
+  };
+  const STORE_IDS = Object.keys(STORE);
+  const THEME_BASE = 'base';
+  const THEMES = [THEME_BASE].concat(STORE_IDS.filter((id) => STORE[id].theme).map((id) => STORE[id].theme));
+  /* Купленное из сохранения: только известные товары, без повторов; всё остальное считается «не куплено» */
+  const normOwned = (list) => (Array.isArray(list) ? STORE_IDS.filter((id) => list.includes(id)) : []);
+  const ownsTheme = (owned, theme) => theme === THEME_BASE || STORE_IDS.some((id) => STORE[id].theme === theme && owned.includes(id));
+  const normTheme = (theme, owned) => (typeof theme === 'string' && THEMES.includes(theme) && ownsTheme(normOwned(owned), theme) ? theme : THEME_BASE);
+  const noAds = (owned) => normOwned(owned).includes('noads');
+
   /* Богатство к концу жизни даёт дополнительный опыт */
   const WEALTH = [5000000, 25000000, 100000000];
 
@@ -1276,6 +1299,7 @@ const Core = (() => {
     newState, age, monthsLeft, weights, odds, healthFactor, incomeMult, baseSalary, salary, luck, passive, assetIncome,
     healthDecay, rollReels, resolve, spin, expected, fork, choose, act, setFocus, check,
     gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS, chronicle,
+    STORE, STORE_IDS, STORE_SHELVES, THEMES, THEME_BASE, normOwned, normTheme, ownsTheme, noAds,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;

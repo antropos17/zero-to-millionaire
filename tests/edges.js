@@ -1,4 +1,4 @@
-/* Крайние случаи: битые и старые сохранения, события под меню и под рекламой, очень большие числа. */
+/* Крайние случаи: битые и старые сохранения, события под меню и под рекламой, очень большие числа, покупки магазина. */
 const { chromium } = require('playwright');
 const path = require('path');
 const file = 'file://' + path.resolve(process.argv[2]);
@@ -51,6 +51,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     'миллион без снимка': mut((c) => { c.S.wonAt = 100; c.S.won = null; }),
     'версия из будущего': mut((c) => { c.S.v = 99; }),
     'улучшение выше максимума': mut((c) => { c.S.up.mult = 9; }),
+    'покупки и тема мусором': mut((c) => { c.M.owned = { noads: true }; c.M.theme = { x: 1 }; }),
     'наследие мусором': mut((c) => { c.S.perks = { cash: 'x' }; c.M.perks = { cash: 99, nope: 3, genes: -4 }; }),
     'очень много денег': mut((c) => { c.S.money = 987654321012; c.S.peak = c.S.money; c.S.wonAt = 20; c.S.won = { reels4: false, assets: 0, debt: false, low: false, deck: 21, gold: 0 }; c.S.asked = true; }),
     'глубокий долг': mut((c) => { c.S.money = -98765432; c.S.health = 0; }),
@@ -162,6 +163,51 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   await p.waitForTimeout(700);
   const debt = await p.evaluate(() => ({ line: document.querySelector('.money-line').scrollWidth - document.querySelector('.money-line').clientWidth, text: document.getElementById('money').textContent, fc: document.getElementById('forecast').textContent }));
   ok('глубокий долг и нулевое здоровье: текст без мусора', debt.line <= 0 && /−/.test(debt.text) && !(await junk(p)), JSON.stringify(debt));
+  await p.close();
+
+  /* 8. Магазин: купленное живёт в метаданных; битые и старые сохранения ничего не ломают и ничего не дарят */
+  const shopSeen = async (M) => {
+    const p = await open(null, mut((c) => { c.M = Object.assign({ seenHelp: true, auto: false }, M); }));
+    await p.click('#menuStore'); await p.waitForTimeout(200);
+    const r = await p.evaluate(() => ({
+      buy: Array.from(document.querySelectorAll('[data-buy]')).map((b) => b.dataset.buy).sort().join(','),
+      theme: document.documentElement.dataset.theme || 'base',
+      thanks: !document.getElementById('menuThanks').hidden,
+    }));
+    await p.click('#storeClose');
+    await p.click('#menuPlay'); await p.waitForTimeout(300);
+    await p.evaluate(() => { const s = window.z2m.state(); if (s.status === 'playing' && !s.fork && !s.traitOptions) window.z2m.skip(2); });
+    r.junk = await junk(p);
+    await p.close();
+    return r;
+  };
+  const ALL = 'noads,thanks,theme-bill,theme-dusk';
+  const metaCases = [
+    ['старое сохранение без покупок', {}, ALL, 'base', false],
+    ['покупки строкой', { owned: 'noads', theme: 'dusk' }, ALL, 'base', false],
+    ['покупки объектом', { owned: { noads: true, thanks: 1 } }, ALL, 'base', false],
+    ['покупки мусором', { owned: [5, null, 'zzz', { id: 'noads' }], theme: 7 }, ALL, 'base', false],
+    ['тема без покупки темы', { owned: ['noads'], theme: 'dusk' }, 'thanks,theme-bill,theme-dusk', 'base', false],
+    ['неизвестная тема', { owned: ['theme-bill', 'theme-dusk'], theme: 'gold' }, 'noads,thanks', 'base', false],
+    ['повторы и чужие id', { owned: ['thanks', 'thanks', 'theme-dusk', 'vip'], theme: 'dusk' }, 'noads,theme-bill', 'dusk', true],
+  ];
+  for (const [name, M, buy, th, thanks] of metaCases) {
+    const before = errors.length;
+    const r = await shopSeen(M);
+    ok(`магазин, сохранение «${name}»: купленное прочитано честно`, errors.length === before && r.buy === buy && r.theme === th && r.thanks === thanks && !r.junk, JSON.stringify(r));
+  }
+
+  /* 9. Магазин открыт во время спина, который открывает развилку: развилка ждёт, окна под магазином нет */
+  p = await open();
+  await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn'); await p.click('#autoBtn');
+  await p.evaluate(() => { const s = window.z2m.state(); s.deck = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 }; s.ms = 6; s.focus = 'work'; s.lastForks = []; s.month = 60; window.z2m.refresh(); });
+  await force(p, [0.8, 0.8, 0.1]);
+  await p.click('#spinBtn');
+  await p.click('#storeBtn');
+  await p.waitForTimeout(1200);
+  ok('магазин поверх спина: развилка ждёт, окна под магазином нет', await p.locator('#storeLay').isVisible() && !(await p.locator('#forkLay').isVisible()) && !!(await st(p)).fork);
+  await p.click('#storeClose'); await p.waitForTimeout(400);
+  ok('после закрытия магазина развилка открылась', await p.locator('#forkLay').isVisible() && !(await p.locator('#storeLay').isVisible()));
   await p.close();
 
   console.log(`проверок пройдено ${passed}, упало ${failed}; ошибок в консоли ${errors.length}`, errors.slice(0, 3));

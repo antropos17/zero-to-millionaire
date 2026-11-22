@@ -27,6 +27,7 @@
         <div class="scene-top">
           <button class="icon-btn" id="menuBtn" type="button" aria-label="Меню"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
           <div class="top-btns">
+            <button class="icon-btn" id="storeBtn" type="button" aria-label="Магазин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5h13l-1 11h-11z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
             <button class="icon-btn" id="soundBtn" type="button" aria-pressed="false" aria-label="Звук">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
@@ -223,13 +224,15 @@
     <button class="btn btn-spin" id="menuPlay" type="button">Новая игра</button>
     <button class="btn btn-small" id="menuNew" type="button" hidden>Новая игра</button>
     <button class="btn btn-small" id="menuHelp" type="button">Как играть</button>
+    <button class="btn btn-small" id="menuStore" type="button">Магазин</button>
     <div class="menu-set" role="group" aria-label="Настройки">
       <button class="btn btn-small" id="menuSound" type="button"></button>
       <button class="btn btn-small" id="menuAuto" type="button"></button>
       <button class="btn btn-small" id="menuSpeed" type="button"></button>
     </div>
     <p class="menu-stats" id="menuStats"></p>
-    <p class="menu-foot">Настоящих денег в игре нет</p>
+    <p class="menu-thanks" id="menuThanks" hidden>Спасибо, что поддержал автора</p>
+    <p class="menu-foot">Покупки пока тестовые: деньги не списываются. Продаётся только удобство, внешний вид и поддержка автора</p>
   </div>
 </div>
 
@@ -282,6 +285,25 @@
   </div>
 </div>
 
+<div class="overlay store-lay" id="storeLay" hidden>
+  <div class="modal store" id="storeBox" role="dialog" aria-modal="true" aria-labelledby="storeTitle" tabindex="-1">
+    <div class="store-head"><h2 id="storeTitle">Магазин</h2><button class="btn btn-small" id="storeClose" type="button">Закрыть</button></div>
+    <p class="store-lead">Удобство, внешний вид и поддержка автора. Шансы, деньги в игре и наследие не продаются.</p>
+    <div class="store-shelves" id="storeShelves"></div>
+    <p class="store-note" id="storeNote" role="status" aria-live="polite"></p>
+    <button class="link-btn store-restore" id="storeRestore" type="button">Восстановить покупки</button>
+  </div>
+</div>
+<div class="overlay pay-lay" id="payLay" hidden>
+  <div class="modal" id="payBox" role="dialog" aria-modal="true" aria-labelledby="payTitle" tabindex="-1">
+    <p class="fork-kind">Тестовая покупка. Деньги не списываются</p>
+    <h2 id="payTitle"></h2>
+    <p id="payText"></p>
+    <dl class="facts"><dt>Цена</dt><dd id="payPrice"></dd></dl>
+    <button class="btn btn-spin" id="payOk" type="button">Купить</button>
+    <button class="btn btn-small btn-alt" id="payCancel" type="button">Отмена</button>
+  </div>
+</div>
 <div class="fly" id="fly" aria-hidden="true"></div>
 
 <script>

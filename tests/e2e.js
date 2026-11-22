@@ -591,6 +591,88 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('второе нажатие начинает с нуля и сразу пускает в игру', s.money === 0 && s.month === 0 && s.life === 1 && !(await p.locator('#menuLay').isVisible()) && !(await p.locator('#overlay').isVisible()));
   await p.close();
 
+  /* 15. Магазин за настоящие деньги (сейчас тестовая оплата): вход, покупки, хранение, темы, честность */
+  p = await mk(null, 'menu');
+  await p.waitForSelector('#menuPlay', { state: 'visible' });
+  const owned = (q) => q.evaluate((k) => { const v = JSON.parse(localStorage.getItem(k) || 'null'); return (v && v.M && v.M.owned) || []; }, KEY);
+  const theme = (q) => q.evaluate(() => document.documentElement.dataset.theme || 'base');
+  ok('в меню есть «Магазин» и честная строка про покупки', await p.locator('#menuStore').isVisible() && /деньги не списываются/.test(await p.textContent('.menu-foot')) && !/Настоящих денег в игре нет/.test(await p.textContent('#menuLay')));
+  await p.click('#menuStore');
+  ok('магазин открывается из меню: три полки, четыре товара, цены «тест»', await p.locator('#storeLay').isVisible() && (await p.locator('.store-shelf').count()) === 3 && (await p.locator('[data-buy]').count()) === 4 && (await p.locator('[data-buy] span').allTextContents()).every((t) => t === 'тест'));
+  ok('в магазине нет «выгодно», скидок, таймеров и сравнений', !/выгод|скидк|осталось|было|сегодня|%/i.test(await p.textContent('#storeBox')), await p.textContent('#storeBox'));
+  await p.click('[data-buy="noads"]');
+  ok('покупка открывает окно тестовой оплаты', await p.locator('#payLay').isVisible() && /Тестовая покупка\. Деньги не списываются/.test(await p.textContent('#payBox')) && (await p.textContent('#payPrice')) === 'тест');
+  await p.click('#payCancel');
+  ok('отказ: ничего не куплено, никаких повторных предложений', !(await p.locator('#payLay').isVisible()) && await p.locator('#storeLay').isVisible() && (await p.textContent('#storeNote')) === '' && (await p.textContent('[data-buy="noads"] b')) === 'Купить' && !(await p.locator('#overlay').isVisible()) && (await owned(p)).length === 0);
+  await p.evaluate(() => { window.z2m.pay = 'error'; });
+  await p.click('[data-buy="thanks"]');
+  ok('ошибка оплаты: ничего не куплено, спокойная строка', /не прошла/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 0 && await p.locator('[data-buy="thanks"]').isVisible());
+  await p.evaluate(() => { window.z2m.pay = null; });
+  for (const id of ['noads', 'theme-bill', 'theme-dusk', 'thanks']) { await p.click(`[data-buy="${id}"]`); await p.click('#payOk'); await p.waitForTimeout(50); }
+  ok('все четыре товара покупаются через заглушку', JSON.stringify(await owned(p)) === JSON.stringify(['noads', 'theme-bill', 'theme-dusk', 'thanks']) && (await p.locator('[data-buy]').count()) === 0);
+  await p.evaluate(() => { window.z2m.payRestore = ['thanks', 'nope']; });
+  await p.click('#storeRestore');
+  ok('«Восстановить покупки» не дарит лишнего и не дублирует', /Новых покупок не найдено/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 4);
+  await p.click('#storeClose');
+  ok('магазин закрывается в один тап, в меню видна благодарность', !(await p.locator('#storeLay').isVisible()) && await p.locator('#menuThanks').isVisible() && /ничего не меняет в игре/i.test(await p.evaluate(() => Core.STORE.thanks.note)));
+  /* темы меняют только цвета: ни одна рамка не сдвигается */
+  await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn');
+  await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
+  const boxes = () => p.evaluate(() => ['.stage', '.scene-wrap', '.hud', '.slot', '.desk', '.tabs', '.ctrl', '#spinBtn', '#money', '.chips', '.focus', '#reels', '#storeBtn']
+    .concat(Array.from(document.querySelectorAll('#shop li')).map((_, i) => `#shop li:nth-child(${i + 1})`))
+    .map((q) => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(':'); }).join('|'));
+  await p.waitForTimeout(400);
+  const bx0 = await boxes(), col0 = await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor);
+  ok('вход в магазин из игры виден', await p.locator('#storeBtn').isVisible());
+  for (const t of ['bill', 'dusk']) {
+    await p.click('#storeBtn'); await p.click(`[data-pick="${t}"]`); await p.click('#storeClose'); await p.waitForTimeout(400);
+    ok(`тема «${t}» выбрана и меняет только цвета`, (await theme(p)) === t && (await boxes()) === bx0 && (await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor)) !== col0 && (await meta(p)).theme === t);
+  }
+  /* покупки переживают перезагрузку, новую жизнь и «Новую игру» */
+  await p.reload(); await enter(p);
+  ok('после перезагрузки покупки и тема на месте', (await owned(p)).length === 4 && (await theme(p)) === 'dusk');
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.traitOptions = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  ok('экран проигрыша: ни входа в магазин, ни упоминаний покупок', (await p.textContent('#modalTitle')) === '65 лет. Время вышло' && !/магазин|покуп|купить|реклам|тест/i.test(await p.textContent('#modalBox')) && (await p.evaluate(() => getComputedStyle(document.getElementById('storeBtn')).visibility)) === 'hidden' && await p.locator('#storeBtn').isDisabled(), await p.textContent('#modalBox'));
+  await p.waitForTimeout(450); await p.click('#modalBtn');
+  ok('новая жизнь: покупки на месте', (await st(p)).life === 2 && (await owned(p)).length === 4);
+  await p.evaluate(() => { const s = window.z2m.state(); s.traitOptions = null; document.getElementById('traitLay').hidden = true; });
+  await p.reload();
+  await p.waitForSelector('#menuNew', { state: 'visible' });
+  await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
+  ok('«Новая игра» стирает жизнь, но не покупки и тему', (await st(p)).life === 1 && (await owned(p)).length === 4 && (await meta(p)).theme === 'dusk' && (await theme(p)) === 'dusk');
+  await p.close();
+
+  /* «Без рекламы» даёт ровно тот же бонус, только без ролика: одинаковая очередь случайных чисел, одинаковый итог */
+  const bonusRun = async (noads) => {
+    const q = await mk();
+    if (noads) { await q.evaluate(() => { window.z2m.pay = 'bought'; }); await q.click('#storeBtn'); await q.click('[data-buy="noads"]'); await q.click('#storeClose'); }
+    await q.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
+    await q.evaluate(() => { const s = window.z2m.state(); Object.assign(s, { fork: 'startup', money: 10000, health: 70, month: 60, boost: 0, boostAt: 0 }); window.z2m.refresh(); });
+    await q.reload(); await enter(q);
+    await q.evaluate(() => { window.z2m.adMs = 60; });
+    const label = await q.textContent('#forkG i');
+    await q.waitForTimeout(450);
+    await force(q, [0.42, 0.42, 0.42, 0.42]);
+    await q.click('#forkG');
+    const adShown = await q.locator('#adLay').isVisible();
+    await q.waitForTimeout(400);
+    const afterFork = JSON.stringify(await st(q));
+    await q.click('#tabBtn-shop');
+    const bl = await q.textContent('li[data-kind="boost"] .btn-buy');
+    await q.locator('li[data-kind="boost"] .btn-buy').click();
+    const adShown2 = await q.locator('#adLay').isVisible();
+    await q.waitForTimeout(400);
+    await force(q, [0.1, 0.5, 0.6, 0.5, 0.5, 0.5, 0.5, 0.5]);
+    await q.evaluate(() => window.z2m.skip(1));
+    const res = { label, bl, adShown, adShown2, afterFork, afterBoost: JSON.stringify(await st(q)) };
+    await q.close();
+    return res;
+  };
+  const ra = await bonusRun(false), rb = await bonusRun(true);
+  ok('без покупки бонусы идут через ролик, с покупкой без него, подписи честные', ra.adShown && ra.adShown2 && !rb.adShown && !rb.adShown2 && /за рекламу/.test(ra.label) && /без рекламы/.test(rb.label) && /Смотреть/.test(ra.bl) && /Забрать/.test(rb.bl), JSON.stringify({ a: [ra.label, ra.bl, ra.adShown, ra.adShown2], b: [rb.label, rb.bl, rb.adShown, rb.adShown2] }));
+  ok('«Без рекламы» не меняет шансы и суммы: золотой вариант и «Удачный год» дают то же самое', ra.afterFork === rb.afterFork && ra.afterBoost === rb.afterBoost && JSON.parse(rb.afterBoost).boost === 11, ra.afterFork === rb.afterFork ? 'год различается' : 'развилка различается');
+
   ok('в консоли нет ошибок', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} проверок упало` : '\nвсе проверки прошли');
