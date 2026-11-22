@@ -1,0 +1,87 @@
+/* Случайные жизни на чистой логике: любые действия в любом порядке, после каждого шага проверяются инварианты. */
+const Core = require('../src/core.js');
+function mulberry(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const bad = {};
+const note = (k, d) => { if (!bad[k]) { bad[k] = { n: 0, d }; } bad[k].n += 1; };
+const KINDS = ['job', 'gym', 'home', 'asset', 'reel', 'add:study', 'add:health', 'add:network', 'add:chance', 'add:wild', 'add:work', 'add:coin', 'add:bill', 'cut:study', 'cut:health', 'cut:network', 'cut:chance', 'cut:bill', 'cut:work', 'cut:coin', 'cut:wild', 'up:mult', 'up:star', 'up:insure', 'up:coach', 'up:nope', 'nope', ''];
+function check(s, where) {
+  const fin = (v) => typeof v === 'number' && isFinite(v);
+  for (const k of ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'charge', 'boost', 'boostAt', 'ms', 'peak', 'earned']) if (!fin(s[k])) note('не число: ' + k, where);
+  if (s.health < 0 || s.health > 100) note('здоровье вне 0..100', where + ' ' + s.health);
+  if (s.skill < 0 || s.network < 0) note('навык или связи ниже нуля', where);
+  for (const k of Core.SYMBOLS) { if (!Number.isInteger(s.deck[k]) || s.deck[k] < Core.MIN_CARDS[k]) note('карты ниже минимума: ' + k, where + ' ' + s.deck[k]); }
+  if (s.charge > Core.chargeMax(s) || s.charge < 0) note('заряд звезды вне границ', where);
+  if (s.month > Core.TOTAL) note('месяц больше конца жизни', where);
+  if (s.status === 'playing' && s.month >= Core.TOTAL) note('жизнь не закончилась в 65', where);
+  if (s.status !== 'playing' && s.fork) note('развилка после конца жизни', where);
+  if (s.wonAt != null && !s.won) note('нет снимка миллиона', where);
+  if (s.status === 'lost' && s.wonAt != null) note('проигрыш с миллионом', where);
+  if ('_gold' in s) note('утёк служебный флаг _gold', where);
+  if (s.job < 0 || s.job >= Core.JOBS.length || s.home < 0 || s.home >= Core.HOMES.length || s.assets > Core.ASSETS.length) note('индекс вне списка', where);
+  if (s.status === 'playing') {
+    const o = Core.odds(s);
+    const sum = Core.SYMBOLS.reduce((a, k) => a + o[k].p, 0);
+    if (Math.abs(sum - 1) > 1e-9) note('шансы символов не дают 1', where + ' ' + sum);
+    if (!(o.any >= 0 && o.any <= 1 + 1e-9)) note('шанс события вне 0..1', where + ' ' + o.any);
+    for (const k of Core.SYMBOLS) for (const f of ['pair', 'triple', 'quad']) if (!(o[k][f] >= 0 && o[k][f] <= 1)) note('шанс комбинации вне 0..1', where);
+    if (!fin(Core.expected(s))) note('средний доход не число', where);
+    if (!fin(Core.salary(s)) || !fin(Core.passive(s)) || Core.salary(s) < 0) note('зарплата или пассив сломаны', where);
+    for (const kind of KINDS) { const c = Core.costOf(s, kind); if (c != null && (!fin(c) || c < 0)) note('цена сломана: ' + kind, where + ' ' + c); }
+  }
+  const txt = JSON.stringify(s);
+  if (/null/.test(JSON.stringify([s.money, s.health, s.skill]))) note('NaN в сохранении', where);
+  const back = JSON.parse(txt);
+  if (JSON.stringify(back) !== txt) note('сохранение не восстанавливается', where);
+}
+let lives = 0, steps = 0, forks = 0, golds = 0, won = 0, lost = 0, retired = 0, maxMoney = 0;
+const N = +process.argv[2] || 1500;
+for (let i = 0; i < N; i++) {
+  const rng = mulberry(77 + i);
+  const perks = {}; for (const id of Core.PERK_IDS) if (rng() < 0.4) perks[id] = Math.floor(rng() * 8) - 1;
+  let s = Core.newState(rng() < 0.5 ? perks : null, 1 + Math.floor(rng() * 3), rng);
+  check(s, 'старт');
+  const style = Math.floor(rng() * 4); /* 0 случайный, 1 жадный покупатель, 2 должник, 3 почти ничего не делает */
+  let guard = 0;
+  while (s.status === 'playing' && guard++ < 5000) {
+    try {
+      if (s.traitOptions) { if (rng() < 0.2) Core.pickTrait(s, 'nope'); if (rng() < 0.2) Core.spin(s, rng); Core.pickTrait(s, s.traitOptions[Math.floor(rng() * s.traitOptions.length)]); check(s, 'черта'); continue; }
+      if (s.fork) {
+        forks++;
+        const f = Core.fork(s);
+        if (!f || /undefined|NaN/.test(JSON.stringify(f))) note('плохой текст развилки', s.fork);
+        if (rng() < 0.1) Core.act(s, 'asset');
+        if (rng() < 0.1) Core.spin(s, rng);
+        const pick = rng() < 0.35 ? 'gold' : rng() < 0.6 ? 0 : 1;
+        if (pick === 'gold') golds++;
+        const r = Core.choose(s, pick, rng) || Core.choose(s, 0, rng) || Core.choose(s, 1, rng);
+        if (!r) note('развилку нельзя закрыть', f.id);
+        else if (/undefined|NaN/.test(JSON.stringify(r))) note('плохой итог развилки', f.id);
+        check(s, 'развилка ' + f.id);
+        continue;
+      }
+      const acts = style === 3 ? 0 : style === 1 ? 6 : Math.floor(rng() * 4);
+      for (let a = 0; a < acts; a++) { Core.act(s, KINDS[Math.floor(rng() * KINDS.length)]); }
+      if (style === 2 && rng() < 0.3) s.money -= Math.round(rng() * 5000);
+      /* богатые жизни: так проверяются поздние состояния, все улучшения и миллионы */
+      if (process.argv.includes('--rich') && rng() < 0.05) { s.money += Math.round(rng() * 400000); s.skill += Math.floor(rng() * 40); }
+      if (rng() < 0.3) Core.setFocus(s, ['work', 'study', 'health', 'network', 'chance', 'nope'][Math.floor(rng() * 6)]);
+      if (rng() < 0.2) Core.startBoost(s);
+      if (s.wonAt != null && rng() < 0.01) { Core.retire(s); retired++; check(s, 'пенсия'); continue; }
+      const charged = Core.canCharge(s) && rng() < 0.5 ? ['work', 'study', 'health', 'network', 'chance'][Math.floor(rng() * 5)] : null;
+      const res = Core.spin(s, rng, rng() < 0.15 ? { auto: true } : charged ? { charged } : null);
+      if (!res && !(charged === 'chance')) note('спин не сработал', 'месяц ' + s.month);
+      if (!res && charged === 'chance') Core.spin(s, rng);
+      if (res && /undefined|NaN/.test(JSON.stringify(res))) note('плохой итог спина', JSON.stringify(res).slice(0, 120));
+      steps++;
+      check(s, 'спин');
+      if (rng() < 0.002) { s = Core.migrate(JSON.parse(JSON.stringify(s))); check(s, 'пересохранение'); }
+    } catch (e) { note('исключение: ' + e.message, (e.stack || '').split('\n')[1]); break; }
+  }
+  if (guard >= 5000) note('жизнь не заканчивается', 'стиль ' + style);
+  lives++; maxMoney = Math.max(maxMoney, s.peak);
+  if (s.status === 'won') won++; else if (s.status === 'lost') lost++;
+  try { const g = Core.goalsMet(s), p = Core.lifePoints(s); if (!Array.isArray(g) || !(p >= 1 && p <= 5)) note('цели или опыт сломаны', String(p)); } catch (e) { note('исключение в целях: ' + e.message, ''); }
+}
+console.log(`жизней ${lives}, спинов ${steps}, развилок ${forks} (золотых ${golds}), миллион ${won}, проигрыш ${lost}, пенсий ${retired}, максимум денег $${Math.round(maxMoney / 1e6)} млн`);
+const keys = Object.keys(bad);
+console.log(keys.length ? 'ПРОБЛЕМЫ:\n' + keys.map((k) => `  ${bad[k].n}×  ${k}  [${bad[k].d}]`).join('\n') : 'нарушений нет');

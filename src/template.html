@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2B45D4">
+<title>Zero to Millionaire</title>
+<style>
+/*FONTS*/
+/*CSS*/
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="left">
+    <section class="stage" aria-label="Твоя жизнь">
+      <header class="titlebar">
+        <h1>Zero to Millionaire</h1>
+        <div class="tags">
+          <span class="tag-job" id="jobText">Раздаёшь листовки</span>
+          <span class="tag" id="ageText">18 лет</span>
+        </div>
+      </header>
+      <div class="scene-wrap" id="sceneWrap">
+        <svg id="scene" viewBox="0 0 400 180" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Сцена: твой дом и ты"></svg>
+        <div class="scene-top">
+          <button class="icon-btn" id="menuBtn" type="button" aria-label="Меню"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+          <div class="top-btns">
+            <button class="icon-btn" id="soundBtn" type="button" aria-pressed="false" aria-label="Звук">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="icon-btn" id="helpBtn" type="button" aria-label="Как играть">?</button>
+          </div>
+        </div>
+        <div class="fx" id="fx" aria-hidden="true"></div>
+      </div>
+
+      <div class="hud">
+        <div class="money-line">
+          <output class="money" id="money">$0</output>
+          <span class="goal" id="goalText">цель $1 000 000</span>
+        </div>
+        <div class="lane" title="Деньги: сколько накоплено от миллиона">
+          <span class="lane-name">Деньги</span>
+          <div class="bar"><div class="fill fill-money" id="moneyFill"></div><div class="ticks" id="ticks"></div></div>
+          <span class="lane-val" id="moneyPct">0%</span>
+        </div>
+        <div class="lane" title="Жизнь: сколько прошло от 18 до 65">
+          <span class="lane-name">Жизнь</span>
+          <div class="bar"><div class="fill fill-life" id="lifeFill"></div></div>
+          <span class="lane-val" id="lifePct">0%</span>
+        </div>
+        <p class="forecast" id="forecast"></p>
+        <dl class="chips">
+          <div><dt>Зарплата</dt><dd id="stSalary"></dd></div>
+          <div><dt>Пассив</dt><dd id="stPassive"></dd></div>
+          <div><dt>Навык</dt><dd id="stSkill"></dd></div>
+          <div><dt>Связи</dt><dd id="stNetwork"></dd></div>
+          <div><dt>Здоровье</dt><dd><span id="stHealth"></span><span class="hp"><span class="hp-fill" id="hpFill"></span></span></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="slot" aria-label="Слот">
+      <div class="focus" role="radiogroup" aria-label="Фокус: какой символ выпадает чаще">
+        <span class="focus-name">Фокус</span>
+        <button type="button" role="radio" data-focus="work"><img alt=""><span>Карьера</span></button>
+        <button type="button" role="radio" data-focus="study"><img alt=""><span>Учёба</span></button>
+        <button type="button" role="radio" data-focus="health"><img alt=""><span>Здоровье</span></button>
+        <button type="button" role="radio" data-focus="network"><img alt=""><span>Связи</span></button>
+        <button type="button" class="charge" id="chargeBtn" disabled><img alt=""><span id="chargeVal">0/10</span></button>
+      </div>
+      <p class="msg" id="msg" role="status" aria-live="polite"></p>
+      <div class="reels" id="reels" aria-hidden="true">
+        <div class="reel"><div class="strip"></div></div>
+        <div class="reel"><div class="strip"></div></div>
+        <div class="reel"><div class="strip"></div></div>
+        <div class="reel reel-4"><div class="strip"></div></div>
+        <div class="mult" id="multCell"><b>×</b></div>
+      </div>
+      <div class="ctrl">
+        <button class="btn btn-spin" id="spinBtn" type="button">Крутить</button>
+        <button class="btn btn-small" id="autoBtn" type="button" aria-pressed="true">Авто</button>
+        <button class="btn btn-small" id="speedBtn" type="button">×1</button>
+      </div>
+    </section>
+  </div>
+
+  <main class="desk">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabBtn-shop" aria-controls="tab-shop" aria-selected="true">Покупки<span class="badge" id="shopBadge"></span></button>
+      <button type="button" role="tab" id="tabBtn-deck" aria-controls="tab-deck" aria-selected="false">Колода</button>
+      <button type="button" role="tab" id="tabBtn-log" aria-controls="tab-log" aria-selected="false">Лента</button>
+      <button type="button" role="tab" id="tabBtn-goals" aria-controls="tab-goals" aria-selected="false">Цели</button>
+    </div>
+
+    <div class="tab-body" id="tab-shop" role="tabpanel" aria-labelledby="tabBtn-shop">
+      <ul class="shop" id="shop">
+        <li data-kind="boost" class="gold"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="job"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="gym"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="home"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="asset"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="reel"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="up-mult"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="up-star"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="up-insure"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="up-coach"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+      </ul>
+    </div>
+
+    <div class="tab-body" id="tab-deck" role="tabpanel" aria-labelledby="tabBtn-deck" hidden>
+      <div class="deck-head"><b id="deckSize"></b></div>
+      <div class="deckbar" id="deckBar" aria-hidden="true"></div>
+      <ul class="shop" id="deck">
+        <li data-kind="work"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="study"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="health"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="network"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="chance"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="coin"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="bill"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+        <li data-kind="wild"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button><div class="under"><small></small><button class="link-btn max-btn" type="button" hidden></button></div></div></li>
+      </ul>
+      <h3 class="sub">Бонусные сеты: три разных символа</h3>
+      <ul class="odds" id="sets"></ul>
+      <details class="more">
+      <summary>Точные шансы и правила</summary>
+      <ul class="odds" id="odds"></ul>
+      <p class="lead" id="oddsAny"></p>
+      <ul class="rule-list">
+        <li>Каждый спин это месяц: приходят зарплата и пассивный доход. Два одинаковых символа дают событие, три дают усиленное.</li>
+        <li>Колода: на каждом барабане выпадает одна случайная карта из колоды. Больше карт символа, выше его шанс. Лишние карты разбавляют колоду.</li>
+        <li>Фокус: карты выбранного символа считаются дважды. Менять можно в любой момент.</li>
+        <li>Откуда берутся карты: повышение кладёт карту Работы, инвестиция карту Монеты, рубеж по деньгам карту Шанса. Остальные можно докупить здесь, цена растёт с каждой картой.</li>
+        <li>Убрать карту тоже стоит денег, и каждая следующая дороже. У Счетов свой счёт: убрать можно три карты. По одной карте каждого символа остаётся всегда.</li>
+        <li>Сеты: три разных символа из списка выше, порядок не важен. Сет считается событием, его умножает множитель. Опыт символам сеты не дают.</li>
+        <li>Джокер достраивает самую большую группу одинаковых, кроме Счетов. Если группы равны, идёт в символ фокуса, иначе в первый слева. Купить можно две карты.</li>
+        <li>Удачный год: за рекламу 12 месяцев вдвое больше зарплата, пассив и деньги хороших событий. После него 24 месяца отдыха.</li>
+        <li>Монета: пара платит пассивный доход за 6 месяцев, тройка за 24. Без инвестиций монеты ничего не дают.</li>
+        <li>Свой месяц: каждый месяц без событий даёт звезде 1 заряд, нужно 10. Полная звезда дальше не копится. По нажатию три барабана на следующем спине покажут выбранный символ.</li>
+        <li>Уровни символов: пара даёт символу 1 опыт, тройка 3, каре 6. На 25 опыта уровень 2, эффект +25%. На 75 уровень 3, эффект +50%.</li>
+        <li>Множитель: клетка справа от барабанов. Крутится только в месяц с хорошим событием и умножает всё хорошее в нём: деньги, навык, связи, здоровье. Счета и развилки не умножает. Шансы значений показаны в покупке и под таблицей шансов.</li>
+        <li>Быстрая звезда сокращает заряд «Своего месяца» с 10 пустых месяцев до 8 и до 6. Страховка уменьшает деньги, которые забирают Счета, на 40% и на 75%. Тренер удваивает опыт символов.</li>
+        <li>Золотой вариант в развилке открывается за просмотр рекламы. Если в первом варианте есть риск, золотой даёт тот же выбор с шансом удачи на 20% выше. Если риска нет, золотой убирает плату и потери. На кнопке всегда написано, что именно ты получишь. Отказаться можно в любой момент.</li>
+        <li>Четвёртый барабан: событие даёт каждый символ, которого на барабанах два и больше, так что две пары дают два события. Четыре одинаковых считаются как две тройки.</li>
+        <li>Развилки: пара Шансов останавливает слот и даёт выбор. Проценты на кнопках настоящие. Каждая связь добавляет +1% к удаче в рискованных развилках, до +20%. Часть развилок бывает только в своём возрасте.</li>
+        <li>Навык: +1% к зарплате за пункт и доступ к повышениям. Растёт от Учёбы и развилок.</li>
+        <li>Связи: +1,5% к зарплате за пункт, считаются первые 40.</li>
+        <li>Здоровье тратится каждый месяц, с возрастом быстрее. Ниже 50 зарплата режется на 25%, ниже 25 на 50%, на нуле зарплаты нет.</li>
+        <li>Жильё: +6% к зарплате и на 10% медленнее расход здоровья за каждый уровень.</li>
+        <li>Суммы событий считаются в месячных зарплатах без штрафа за здоровье. Счета могут увести баланс в минус.</li>
+        <li>Транспорт на сцене меняется с рубежами по деньгам: $1 тыс, $10 тыс, $50 тыс, $100 тыс, $250 тыс и $500 тыс. Сам транспорт на доход не влияет.</li>
+        <li>Если авто включено, пока тебя нет, жизнь идёт: месяц за минуту, не больше года за раз. Развилки в это время проходят мимо.</li>
+      </ul>
+      </details>
+    </div>
+
+    <div class="tab-body" id="tab-log" role="tabpanel" aria-labelledby="tabBtn-log" hidden>
+      <ol class="log" id="log"></ol>
+    </div>
+
+    <div class="tab-body" id="tab-goals" role="tabpanel" aria-labelledby="tabBtn-goals" hidden>
+      <div class="life-btns" id="lifeBtns">
+        <button class="btn btn-spin" id="nextBtn" type="button">Начать новую жизнь</button>
+        <button class="btn btn-small" id="retireBtn" type="button">Выйти на пенсию</button>
+      </div>
+      <div class="trait-line" id="traitLine"></div>
+      <h3 class="sub" id="ptsLine">Наследие</h3>
+      <ul class="shop" id="perks">
+        <li data-kind="perk-cash"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-genes"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-tough"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-ties"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-school"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-sale"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-star"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-traits"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="perk-joker"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+      </ul>
+      <h3 class="sub" id="goalsLead">Цели</h3>
+      <ul class="goals" id="goals"></ul>
+      <details class="more">
+      <summary>Как работает опыт</summary>
+      <ul class="rule-list">
+        <li>Опыт за жизнь: 1 за прожитую до 65, 2 за миллион, и ещё по одному за $5 млн, $25 млн и $100 млн.</li>
+        <li>После миллиона жизнь не заканчивается: можно выйти на пенсию сразу или играть до 65 ради большего.</li>
+        <li>Каждая цель один раз за всю игру даёт ещё +1 опыта. Засчитывается в конце жизни.</li>
+        <li>Опыт тратится на наследие. Купленное действует с начала следующей жизни и остаётся навсегда.</li>
+        <li>Со второй жизни на старте выбираешь одну черту из нескольких случайных. Она действует до конца жизни.</li>
+      </ul>
+      </details>
+    </div>
+  </main>
+</div>
+
+<div class="screen" id="boot" role="status" aria-live="polite">
+  <div class="menu-box">
+    <p class="menu-logo">Zero to<br>Millionaire</p>
+    <div class="boot-bar"><div class="boot-fill" id="bootFill"></div></div>
+    <p class="menu-sub" id="bootText">Загрузка: шрифты и картинки</p>
+  </div>
+</div>
+
+<div class="screen" id="menuLay" hidden>
+  <div class="menu-box" id="menuBox" role="dialog" aria-modal="true" aria-labelledby="menuTitle" tabindex="-1">
+    <div class="menu-coins" id="menuCoins" aria-hidden="true"></div>
+    <h2 class="menu-logo" id="menuTitle">Zero to<br>Millionaire</h2>
+    <p class="menu-save" id="menuSave"></p>
+    <button class="btn btn-spin" id="menuPlay" type="button">Новая игра</button>
+    <button class="btn btn-small" id="menuNew" type="button" hidden>Новая игра</button>
+    <button class="btn btn-small" id="menuHelp" type="button">Как играть</button>
+    <div class="menu-set" role="group" aria-label="Настройки">
+      <button class="btn btn-small" id="menuSound" type="button"></button>
+      <button class="btn btn-small" id="menuAuto" type="button"></button>
+      <button class="btn btn-small" id="menuSpeed" type="button"></button>
+    </div>
+    <p class="menu-stats" id="menuStats"></p>
+    <p class="menu-foot">Настоящих денег в игре нет</p>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
+    <div class="modal-art" id="modalArt" aria-hidden="true"></div>
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+    <button class="btn btn-spin" id="modalBtn" type="button"></button>
+    <button class="btn btn-small btn-alt" id="modalAlt" type="button" hidden></button>
+  </div>
+</div>
+
+<div class="overlay overlay-sheet" id="forkLay" hidden>
+  <div class="modal fork" id="forkBox" role="dialog" aria-modal="true" aria-labelledby="forkTitle" tabindex="-1">
+    <div class="fork-head"><img id="forkIcon" alt=""><div><p class="fork-kind">Развилка</p><h2 id="forkTitle"></h2></div></div>
+    <p id="forkText"></p>
+    <div class="fork-opts">
+      <button class="opt opt-g" id="forkG" type="button"><i>Золотой: за рекламу</i><b></b><span></span></button>
+      <button class="opt opt-a" id="forkA" type="button"><b></b><span></span></button>
+      <button class="opt opt-b" id="forkB" type="button"><b></b><span></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="adLay" hidden>
+  <div class="modal fork" id="adBox" role="dialog" aria-modal="true" aria-labelledby="adTitle" tabindex="-1">
+    <div class="fork-head"><img id="adIcon" alt=""><div><p class="fork-kind">Заглушка: в прототипе рекламы нет</p><h2 id="adTitle">Здесь будет ролик</h2></div></div>
+    <p>В настоящей игре на этом месте идёт реклама. Сейчас это просто таймер. Когда он дойдёт до конца, ты получишь обещанный бонус.</p>
+    <div class="ad-bar"><div class="ad-fill" id="adFill"></div></div>
+    <p class="ad-left" id="adLeft" role="status"></p>
+    <button class="link-btn later" id="adBack" type="button">Вернуться к выбору</button>
+  </div>
+</div>
+
+<div class="overlay" id="chargeLay" hidden>
+  <div class="modal fork" id="chargeBox" role="dialog" aria-modal="true" aria-labelledby="chargeTitle" tabindex="-1">
+    <div class="fork-head"><img id="chargeIcon" alt=""><div><h2 id="chargeTitle">Свой месяц</h2></div></div>
+    <p>Выбери символ: на следующем спине три барабана покажут его.</p>
+    <div class="fork-opts charge-opts" id="chargeOpts"></div>
+    <button class="link-btn later" id="chargeLater" type="button">Позже</button>
+  </div>
+</div>
+
+<div class="overlay" id="traitLay" hidden>
+  <div class="modal fork" id="traitBox" role="dialog" aria-modal="true" aria-labelledby="traitTitle" tabindex="-1">
+    <div class="fork-head"><img id="traitIcon" alt=""><div><p class="fork-kind" id="traitKind"></p><h2 id="traitTitle">Выбери черту</h2></div></div>
+    <p>Действует всю эту жизнь.</p>
+    <div class="fork-opts charge-opts" id="traitOpts"></div>
+  </div>
+</div>
+
+<div class="fly" id="fly" aria-hidden="true"></div>
+
+<script>
+/*CORE*/
+</script>
+<script>
+/*UI*/
+</script>
+</body>
+</html>

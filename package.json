@@ -1,0 +1,20 @@
+{
+  "name": "zero-to-millionaire",
+  "version": "0.12.0",
+  "private": true,
+  "description": "Idle-игра: слот крутит месяцы жизни, цель — миллион до 65. Собирается в один самодостаточный HTML.",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && node tests/e2e.js dist/zero-to-millionaire.html",
+    "test:edges": "npm run build && node tests/edges.js dist/zero-to-millionaire.html",
+    "test:forks": "npm run build && node tests/forks.js dist/zero-to-millionaire.html",
+    "test:fuzz": "node tests/fuzz-core.js 600 && node tests/fuzz-core.js 300 --rich",
+    "test:monkey": "npm run build && node tests/monkey.js dist/zero-to-millionaire.html 60",
+    "test:sweep": "npm run build && node tests/sweep.js dist/zero-to-millionaire.html",
+    "test:all": "npm run build && node tests/e2e.js dist/zero-to-millionaire.html && node tests/edges.js dist/zero-to-millionaire.html && node tests/forks.js dist/zero-to-millionaire.html && npm run test:fuzz",
+    "sim": "node tools/sim.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
