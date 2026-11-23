@@ -97,6 +97,11 @@
     </div>
 
     <div class="tab-body" id="tab-shop" role="tabpanel" aria-labelledby="tabBtn-shop">
+      <div class="auto-bar" id="autoBar" hidden>
+        <button class="auto-sw" id="autoToggle" type="button" role="switch" aria-checked="false"><i aria-hidden="true"></i><b>Автопокупки</b></button>
+        <span class="auto-sum" id="autoSum"></span>
+        <button class="link-btn" id="autoEdit" type="button">Настроить</button>
+      </div>
       <div class="shop-groups" id="shop">
       <h3 class="sub" id="adsHead">Бонусы</h3>
       <ul class="shop">
@@ -279,6 +284,14 @@
   </div>
 </div>
 
+<div class="overlay" id="scLay" hidden>
+  <div class="modal fork" id="scBox" role="dialog" aria-modal="true" aria-labelledby="scTitle" tabindex="-1">
+    <div class="fork-head"><img id="scIcon" alt=""><div><p class="fork-kind" id="scKind"></p><h2 id="scTitle">Выбери старт</h2></div></div>
+    <p>Колода, шансы, выплаты и цены на любом старте одинаковые.</p>
+    <div class="fork-opts charge-opts" id="scOpts"></div>
+  </div>
+</div>
+
 <div class="overlay" id="traitLay" hidden>
   <div class="modal fork" id="traitBox" role="dialog" aria-modal="true" aria-labelledby="traitTitle" tabindex="-1">
     <div class="fork-head"><img id="traitIcon" alt=""><div><p class="fork-kind" id="traitKind"></p><h2 id="traitTitle">Выбери черту</h2></div></div>
@@ -291,10 +304,19 @@
 <div class="overlay store-lay" id="storeLay" hidden>
   <div class="modal store" id="storeBox" role="dialog" aria-modal="true" aria-labelledby="storeTitle" tabindex="-1">
     <div class="store-head"><h2 id="storeTitle">Магазин</h2><button class="btn btn-small" id="storeClose" type="button">Закрыть</button></div>
-    <p class="store-lead">Удобство, внешний вид и поддержка автора. Шансы, деньги в игре и наследие не продаются.</p>
+    <p class="store-lead">Удобство, новые жизни, внешний вид и поддержка автора. Шансы, деньги в игре и наследие не продаются.</p>
     <div class="store-shelves" id="storeShelves"></div>
     <p class="store-note" id="storeNote" role="status" aria-live="polite"></p>
     <button class="link-btn store-restore" id="storeRestore" type="button">Восстановить покупки</button>
+  </div>
+</div>
+<div class="overlay" id="autoLay" hidden>
+  <div class="modal auto" id="autoBox" role="dialog" aria-modal="true" aria-labelledby="autoTitle" tabindex="-1">
+    <div class="store-head"><h2 id="autoTitle">Автопокупки</h2><button class="btn btn-small" id="autoClose" type="button">Готово</button></div>
+    <p class="store-lead">Покупают то же, что купил бы ты, по тем же ценам, сразу после месяца. Только пока игра открыта и идёт: пока тебя нет, не покупают ничего. Фокус, развилки, звезду, колоду, бонусы и наследие не трогают; пока действует скидка за рекламу, платного не берут. Каждая покупка видна в ленте.</p>
+    <button class="auto-sw auto-main" id="autoMain" type="button" role="switch" aria-checked="false"><i aria-hidden="true"></i><b>Автопокупки включены</b></button>
+    <div class="auto-res" id="autoRes" role="radiogroup" aria-label="Запас"><span>Покупать, когда денег не меньше цены</span></div>
+    <ul class="auto-list" id="autoList"></ul>
   </div>
 </div>
 <div class="overlay pay-lay" id="payLay" hidden>

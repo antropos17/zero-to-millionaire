@@ -1,0 +1,2 @@
+casual    наследие=0  побед 100%  миллион p10/med/p90: 45/47/49  проигравшие med: $NaN  должность: 8  развилок: 35.1  звёзд: 12.8  колода: 47  к 65: med $14.6 млн, $5M 100%, $25M 1%, $100M 0%
+   цели, % жизней: m50 99  m40 0  m35 0  m30 0  noreel 0  noinvest 0  nodebt 98  healthy 0  thin 0  nogold 100  levels 0  villa 100  unicorn 6  yes10 49  sets 91  quad 100  w1 100  w2 1  w3 0

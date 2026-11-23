@@ -25,12 +25,15 @@
     },
   };
 
-  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], look: C.normLook(null, []) });
+  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], look: C.normLook(null, []), autobuy: C.normAuto(null) });
+  /* Случайность только для вида (пролетающие символы, монеты, конфетти): своя, не Math.random.
+     Так скорость и анимации не меняют, какие случайные числа достаются самой игре: ×1 и ×8 дают одну жизнь. */
+  const visRand = Math.random;
   let S = C.newState(null, 1);
   let M = freshMeta();
 
   function validState(s) {
-    if (!s || s.v !== 8) return false;
+    if (!s || s.v !== 9) return false;
     if (!Array.isArray(s.story) || !s.story.every((e) => e && typeof e === 'object' && typeof e.m === 'number' && isFinite(e.m) && typeof e.k === 'string')) return false;
     const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt', 'ads', 'starAt', 'saleAt'];
     const num = (v) => typeof v === 'number' && isFinite(v);
@@ -44,6 +47,8 @@
     if (!Array.isArray(s.lastForks) || !Array.isArray(s.flags.sets)) return false;
     if (!s.perks || !C.PERK_IDS.every((k) => num(s.perks[k]))) return false;
     if (s.trait != null && !C.TRAIT_IDS.includes(s.trait)) return false;
+    if (s.sc !== C.SC_BASE && !C.SC_IDS.includes(s.sc)) return false;
+    if (s.scOptions != null && !(Array.isArray(s.scOptions) && s.scOptions[0] === C.SC_BASE && s.scOptions.length > 1 && s.scOptions.every((x) => x === C.SC_BASE || C.SC_IDS.includes(x)))) return false;
     if (s.traitOptions != null && !(Array.isArray(s.traitOptions) && s.traitOptions.length && s.traitOptions.every((t) => C.TRAIT_IDS.includes(t)))) return false;
     if (!['playing', 'won', 'lost'].includes(s.status)) return false;
     if (!C.FOCI.includes(s.focus)) return false;
@@ -257,8 +262,8 @@
       const im = new Image();
       im.src = ICON.coin;
       fly.appendChild(im);
-      const sx = a.left + a.width * (0.2 + 0.6 * Math.random()), sy = a.top + a.height / 2;
-      const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 120, my = Math.min(sy, ty) - 30 - Math.random() * 50;
+      const sx = a.left + a.width * (0.2 + 0.6 * visRand()), sy = a.top + a.height / 2;
+      const mx = (sx + tx) / 2 + (visRand() - 0.5) * 120, my = Math.min(sy, ty) - 30 - visRand() * 50;
       const an = im.animate([
         { transform: `translate(${sx}px, ${sy}px) scale(0.4)`, opacity: 0 },
         { transform: `translate(${sx}px, ${sy - 14}px) scale(1.1)`, opacity: 1, offset: 0.12 },
@@ -276,14 +281,14 @@
       const p = document.createElement('i');
       p.style.background = cols[i % cols.length];
       fly.appendChild(p);
-      const x0 = r.left + r.width * (0.3 + Math.random() * 0.4), y0 = r.top + r.height * 0.45;
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = (big ? 150 : 90) + Math.random() * (big ? 190 : 110);
+      const x0 = r.left + r.width * (0.3 + visRand() * 0.4), y0 = r.top + r.height * 0.45;
+      const ang = -Math.PI / 2 + (visRand() - 0.5) * 2.2, v = (big ? 150 : 90) + visRand() * (big ? 190 : 110);
       const dx = Math.cos(ang) * v, dy = Math.sin(ang) * v;
       const an = p.animate([
         { transform: `translate(${x0}px, ${y0}px) rotate(0deg)`, opacity: 1 },
-        { transform: `translate(${x0 + dx * 0.8}px, ${y0 + dy}px) rotate(${200 + Math.random() * 200}deg)`, opacity: 1, offset: 0.38, easing: 'cubic-bezier(.4,0,.9,.6)' },
-        { transform: `translate(${x0 + dx * 1.15}px, ${y0 + dy + (big ? 420 : 260)}px) rotate(${500 + Math.random() * 300}deg)`, opacity: 0 },
-      ], { duration: (big ? 1900 : 1300) + Math.random() * 400, easing: 'cubic-bezier(.1,.7,.3,1)' });
+        { transform: `translate(${x0 + dx * 0.8}px, ${y0 + dy}px) rotate(${200 + visRand() * 200}deg)`, opacity: 1, offset: 0.38, easing: 'cubic-bezier(.4,0,.9,.6)' },
+        { transform: `translate(${x0 + dx * 1.15}px, ${y0 + dy + (big ? 420 : 260)}px) rotate(${500 + visRand() * 300}deg)`, opacity: 0 },
+      ], { duration: (big ? 1900 : 1300) + visRand() * 400, easing: 'cubic-bezier(.1,.7,.3,1)' });
       an.onfinish = () => p.remove();
     }
   }
@@ -431,6 +436,8 @@
     clearHits();
     if (dur <= 0 || !strips[0].animate) {
       target.forEach((sym, i) => setReel(i, sym));
+      /* на ×8 барабаны встают сразу: один звук остановки за спин вместо трёх-четырёх */
+      if (fast()) sfx.stop();
       done();
       return;
     }
@@ -442,7 +449,7 @@
     anims = strips.slice(0, n).map((strip, i) => {
       /* пролетающие символы берутся с теми же весами, что и настоящие */
       const filler = [];
-      for (let k = 0; k < 2 + i; k++) filler.push(...C.rollReels(S));
+      for (let k = 0; k < 2 + i; k++) filler.push(...C.rollReels(S, visRand));
       const cells = [cell(target[i]), ...filler.map(cell), cell(shown[i])];
       strip.replaceChildren(...cells);
       const h = reelEls[i].clientHeight;
@@ -465,7 +472,10 @@
   }
 
   /* ---------- Цикл спинов ---------- */
-  const SPEEDS = [1, 2, 4];
+  /* ×8 — товар «Скорость ×8» (полка «Удобство»): четвёртое положение есть только у владельца */
+  const speeds = () => (M.owned.includes('speed8') ? [1, 2, 4, 8] : [1, 2, 4]);
+  /* на ×8 барабаны не анимируются, как при «без анимаций»: 8 спинов в секунду анимация бы не успела */
+  const fast = () => M.speed >= 8;
   let phase = 'idle';
   let timer = null;
   let pending = null;
@@ -475,12 +485,14 @@
   let forkOpen = false;
   let chargeOpen = false;
   let traitOpen = false;
+  let scOpen = false;
   let adOpen = false;
   let menuOpen = true;
   let storeOpen = false;
+  let autoOpen = false;
   const spinMs = () => 1000 / M.speed;
   const holdMs = () => 800 / M.speed;
-  const blocked = () => menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
+  const blocked = () => menuOpen || storeOpen || autoOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen || !!S.fork || !!S.traitOptions || !!S.scOptions || S.status !== 'playing';
 
   /* chargedSym: символ «Своего месяца», если игрок потратил звезду */
   function startSpin(chargedSym) {
@@ -491,7 +503,7 @@
     phase = 'spinning';
     pending = reels;
     pendingCharged = typeof chargedSym === 'string' ? chargedSym : null;
-    animateReels(pending, reduceMotion ? 0 : spinMs(), finishSpin);
+    animateReels(pending, reduceMotion || fast() ? 0 : spinMs(), finishSpin);
   }
 
   function finishSpin() {
@@ -502,6 +514,7 @@
     phase = 'idle';
     if (!res) return;
     showResult(res);
+    autoStep();
     render(prev);
     save();
     if (S.status !== 'playing') { setTimeout(endLife, reduceMotion ? 0 : 500); return; }
@@ -509,7 +522,7 @@
     if (S.fork) { setTimeout(openFork, reduceMotion ? 0 : 450); return; }
     if (wantCharge && C.canCharge(S)) { openCharge(); return; }
     wantCharge = false;
-    schedule(reduceMotion ? spinMs() : 0);
+    schedule(reduceMotion || fast() ? spinMs() : 0);
   }
 
   function schedule(extra) {
@@ -659,7 +672,7 @@
     if (!adOpen) return;
     stopAd();
     openedAt = Date.now();
-    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
+    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (scOpen) $('scBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
   }
   /* Купленное «Без рекламы» отдаёт тот же бонус сразу, без ролика: суммы и ограничения не меняются */
   function ownsNoAds() { return C.noAds(M.owned); }
@@ -728,7 +741,7 @@
     if (sym) { sfx.fork(); startSpin(sym); } else schedule();
   }
   function askCharge() {
-    if (!C.canCharge(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.canCharge(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     clearTimeout(timer);
     if (phase === 'spinning') { wantCharge = true; anims.slice().forEach((a) => a.finish()); } else openCharge();
   }
@@ -743,7 +756,7 @@
   const UP_FLOAT = { mult: 'Множитель!', star: 'Звезда быстрее', insure: 'Счета мягче', coach: 'Опыт ×2' };
   const FLOAT = { job: () => 'Повышение!', home: () => 'Новоселье!', asset: () => `+${money(C.assetIncome(S, S.assets - 1))} в мес.`, gym: () => 'здоровье +20', reel: () => 'Четыре барабана!' };
   function useBoost(li) {
-    if (!C.boostReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.boostReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.startBoost(S)) { schedule(); return; }
       sfx.big(); charAct('jump'); confetti(20, false);
@@ -754,7 +767,7 @@
     });
   }
   function useStar(li) {
-    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.chargeStar(S)) { schedule(); return; }
       sfx.big();
@@ -765,7 +778,7 @@
     });
   }
   function useSale(li) {
-    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.startSale(S)) { schedule(); return; }
       sfx.big();
@@ -803,6 +816,28 @@
     render(prev);
     save();
   }
+  /* ---------- Автопокупки: после каждого месяца, пока игра открыта и идёт ---------- */
+  /* Покупают через C.autoBuy ту же act(), что кнопки; догонялки «Пока тебя не было» и z2m.skip сюда не заходят.
+     Каждая покупка — запись в ленте с пометкой. Звука и вспышек нет: на ×8 это был бы звук каждый месяц. */
+  const ownsAuto = () => M.owned.includes('autobuy');
+  const AUTO_LOG = {
+    job: (i) => `Повышение: ${C.JOBS[i].name}`,
+    gym: () => 'Спортзал: здоровье +20',
+    home: (i) => `Переезд: ${C.HOMES[i].name}`,
+    asset: (i) => `Инвестиция: ${C.ASSETS[i].name}`,
+    reel: () => 'Четвёртый барабан',
+  };
+  const autoText = (b) => (AUTO_LOG[b.kind] ? AUTO_LOG[b.kind](b.lvl)
+    : `Улучшение: ${C.UPGRADES[b.kind.slice(3)].name}` + (C.UPGRADES[b.kind.slice(3)].costs.length > 1 ? `, уровень ${b.lvl}` : ''));
+  let lastAuto = [];
+  function autoStep() {
+    if (!ownsAuto() || !M.autobuy.on) return [];
+    const got = C.autoBuy(S, M.autobuy);
+    lastAuto = got;
+    got.forEach((b) => pushLog('Автопокупка. ' + autoText(b), b.cost ? -b.cost : null, 'auto'));
+    return got;
+  }
+
   function setFocus(f) {
     if (!C.setFocus(S, f)) return;
     sfx.tick();
@@ -1154,6 +1189,7 @@
     document.querySelector('.slot').classList.toggle('four', s.reels4);
     document.querySelector('.slot').classList.toggle('has-mult', s.up.mult > 0);
 
+    renderAutoBar();
     /* спин мог закончиться уже под открытым меню: сводка в нём не должна отставать */
     if (menuOpen) renderMenu();
     renderForecast();
@@ -1203,7 +1239,12 @@
     hideModal();
     if (fn) fn();
   }
-  const resume = () => { if (menuOpen) return; if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else schedule(); };
+  /* Начало жизни: сначала выбор старта (если куплены сценарии), потом черта. true — окно открыто */
+  function openStart() {
+    if (S.scOptions) openSc(); else if (S.traitOptions) openTrait(); else return false;
+    return true;
+  }
+  const resume = () => { if (menuOpen) return; if (openStart()) return; if (S.fork) openFork(); else schedule(); };
 
   function showHelp() {
     const row = (icon, text) => `<li><img src="${ICON[icon]}" alt=""><span>${text}</span></li>`;
@@ -1305,7 +1346,7 @@
 
   function newLife() {
     if (S.status === 'playing') return;
-    S = C.newState(M.perks, S.life + 1);
+    S = C.newState(M.perks, S.life + 1, null, C.ownedScenarios(M.owned));
     M.log = [];
     oddsKey = ''; goalsKey = '';
     clearHits();
@@ -1314,8 +1355,41 @@
     showTab('shop');
     render();
     save();
+    if (!openStart()) schedule(600);
+  }
+
+  /* ---------- Старт жизни: стандартный или купленный сценарий (полка «Новые жизни») ---------- */
+  const SC_ICON = { base: 'star', loan: 'study', late: 'work', flat: 'home' };
+  function openSc() {
+    if (!S.scOptions || menuOpen || storeOpen) return;
+    scOpen = true;
+    clearTimeout(timer);
+    $('scIcon').src = ICON.home;
+    $('scKind').textContent = `Жизнь ${S.life}: с чего начать`;
+    $('scOpts').innerHTML = S.scOptions.map((id) => {
+      const sc = C.SCENARIOS[id];
+      const name = sc ? sc.name : 'Обычный старт';
+      const note = sc ? sc.note : `18 лет и ${S.money ? money(S.money) + ' от семьи' : 'ноль на счету'}`;
+      return `<button class="opt" type="button" data-sc="${id}"><img src="${ICON[SC_ICON[id] || 'star']}" alt=""><b>${esc(name)}</b><span>${esc(note)}</span></button>`;
+    }).join('');
+    $('scLay').hidden = false;
+    openedAt = Date.now();
+    $('scBox').focus();
+  }
+  function chooseSc(id) {
+    if (!scOpen || Date.now() - openedAt < GUARD) return;
+    if (!C.pickScenario(S, id)) return;
+    scOpen = false;
+    $('scLay').hidden = true;
+    sfx.fork();
+    const sc = C.SCENARIOS[id];
+    if (sc) { pushLog(sc.intro, null, 'plain'); setMsg(sc.intro, null, 'plain'); }
+    shownMoney = S.money;
+    render();
+    save();
     if (S.traitOptions) openTrait(); else schedule(600);
   }
+  $('scOpts').addEventListener('click', (e) => { const b = e.target.closest('[data-sc]'); if (b) chooseSc(b.dataset.sc); });
 
   /* ---------- Черта: одна из трёх на старте жизни ---------- */
   function openTrait() {
@@ -1364,7 +1438,7 @@
 
   /* Пока вкладка закрыта или скрыта, жизнь идёт: месяц за минуту, не больше года за раз */
   function catchUp(ms) {
-    if (!M.auto || S.status !== 'playing' || S.fork || S.traitOptions) return false;
+    if (!M.auto || S.status !== 'playing' || S.fork || S.traitOptions || S.scOptions) return false;
     const n = Math.min(C.YEAR, Math.floor(ms / 60000));
     if (n < 1) return false;
     const before = S.money;
@@ -1405,7 +1479,8 @@
     if (M.auto) schedule(); else clearTimeout(timer);
   });
   $('speedBtn').addEventListener('click', () => {
-    M.speed = SPEEDS[(SPEEDS.indexOf(M.speed) + 1) % SPEEDS.length];
+    const list = speeds();
+    M.speed = list[(list.indexOf(M.speed) + 1) % list.length];
     render(); save();
     if (phase !== 'spinning') schedule();
   });
@@ -1414,7 +1489,7 @@
     render(); save();
     if (M.sound) sfx.good();
   });
-  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !storeOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen) showHelp(); });
+  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !storeOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen && !scOpen) showHelp(); });
   document.querySelector('.focus').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-focus]');
     if (b) setFocus(b.dataset.focus);
@@ -1456,11 +1531,11 @@
   function resetAll() {
     clearTimeout(timer);
     anims.slice().forEach((a) => a.cancel());
-    anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false;
-    $('chargeLay').hidden = true; $('traitLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
+    anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false; scOpen = false;
+    $('chargeLay').hidden = true; $('traitLay').hidden = true; $('scLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
     store.clear();
-    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look };
-    S = C.newState(null, 1);
+    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look, autobuy: M.autobuy };
+    S = C.newState(null, 1, null, C.ownedScenarios(M.owned));
     M = Object.assign(freshMeta(), keep);
     hideModal();
     oddsKey = ''; goalsKey = '';
@@ -1469,7 +1544,7 @@
     shownMoney = 0; away = 0;
     setMsg('Новая игра. Тебе 18 лет и ноль на счету.', null, 'plain');
     showTab('shop');
-    render(); save(); schedule(600);
+    render(); save(); if (!openStart()) schedule(600);
   }
   /* Кнопка с подтверждением: первое нажатие спрашивает, второе в течение четырёх секунд делает */
   function twoStep(btn, idle, ask, run) {
@@ -1481,6 +1556,78 @@
       setTimeout(() => { if (armed && Date.now() >= armed) { armed = 0; btn.textContent = idle; } }, 4100);
     });
   }
+
+  /* ---------- Окно «Автопокупки»: правила владельца, хранятся в метаданных между жизнями ---------- */
+  const AUTO_RULES = [
+    ['job', 'Повышение', 'Бесплатно, когда хватает навыка'],
+    ['gym', 'Спортзал', '+20 здоровья, пока не 100'],
+    ['home', 'Жильё', 'Следующий переезд'],
+    ['asset', 'Инвестиции', 'Следующая по списку'],
+    ['reel', 'Четвёртый барабан', 'Один раз за жизнь'],
+    ['up:mult', 'Множитель', 'Следующий уровень'],
+    ['up:star', 'Быстрая звезда', 'Следующий уровень'],
+    ['up:insure', 'Страховка', 'Следующий уровень'],
+    ['up:coach', 'Тренер', 'Один уровень'],
+  ];
+  const ruleOn = (k) => (k === 'job' ? M.autobuy.job : M.autobuy.kinds[k]);
+  const ruleCount = () => AUTO_RULES.filter(([k]) => ruleOn(k)).length;
+  function renderAutoBar() {
+    const bar = $('autoBar'), has = ownsAuto();
+    if (bar.hidden === has) bar.hidden = !has;
+    if (!has) return;
+    const a = M.autobuy, n = ruleCount();
+    $('autoToggle').setAttribute('aria-checked', String(a.on));
+    const sum = !a.on ? 'выключены' : !n ? 'ни одного правила' : S.sale ? 'ждут, пока ты потратишь скидку' : `${n} ${plural(n, 'правило', 'правила', 'правил')} · запас ×${a.reserve}`;
+    if ($('autoSum').textContent !== sum) $('autoSum').textContent = sum;
+  }
+  function renderAuto() {
+    const a = M.autobuy;
+    $('autoMain').setAttribute('aria-checked', String(a.on));
+    $('autoMain').firstElementChild.nextElementSibling.textContent = a.on ? 'Автопокупки включены' : 'Автопокупки выключены';
+    $('autoRes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.res === a.reserve)));
+    $('autoList').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(ruleOn(b.dataset.rule))));
+    $('autoList').classList.toggle('auto-off', !a.on);
+  }
+  $('autoRes').insertAdjacentHTML('beforeend', C.AUTO_RESERVES.map((r) => `<button class="btn btn-small" type="button" role="radio" data-res="${r}">× ${r}</button>`).join(''));
+  $('autoList').innerHTML = AUTO_RULES.map(([k, name, note]) => `<li><button class="auto-sw" type="button" role="switch" data-rule="${k}" aria-checked="false"><i aria-hidden="true"></i><b>${esc(name)}</b><span>${esc(note)}</span></button></li>`).join('');
+  function openAuto() {
+    if (!ownsAuto() || autoOpen || menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
+    autoOpen = true;
+    clearTimeout(timer);
+    if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
+    renderAuto();
+    $('autoLay').hidden = false;
+    $('autoBox').focus();
+  }
+  function closeAuto() {
+    if (!autoOpen) return;
+    autoOpen = false;
+    $('autoLay').hidden = true;
+    save();
+    /* время во вкладке-невидимке, пока окно было открыто, засчитывается после закрытия */
+    const gone = away;
+    away = 0;
+    if (menuOpen) return;
+    if (openStart()) return; if (S.fork) openFork(); else if (!catchUp(gone)) schedule();
+  }
+  function setAuto(patch) {
+    M.autobuy = C.normAuto(Object.assign({}, M.autobuy, patch));
+    if (autoOpen) renderAuto();
+    renderAutoBar();
+    save();
+  }
+  $('autoToggle').addEventListener('click', () => { if (ownsAuto()) setAuto({ on: !M.autobuy.on }); });
+  $('autoEdit').addEventListener('click', openAuto);
+  $('autoClose').addEventListener('click', closeAuto);
+  $('autoLay').addEventListener('click', (e) => { if (e.target === $('autoLay')) closeAuto(); });
+  $('autoMain').addEventListener('click', () => setAuto({ on: !M.autobuy.on }));
+  $('autoRes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setAuto({ reserve: +b.dataset.res }); });
+  $('autoList').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const k = b.dataset.rule;
+    if (k === 'job') setAuto({ job: !M.autobuy.job }); else setAuto({ kinds: Object.assign({}, M.autobuy.kinds, { [k]: !M.autobuy.kinds[k] }) });
+  });
 
   /* ---------- Главное меню ---------- */
   let hasSave = false;
@@ -1510,7 +1657,7 @@
     $('menuBox').focus();
   }
   function openMenu() {
-    if (menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
     if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
     save();
     showMenu();
@@ -1518,15 +1665,18 @@
   /* Вход в игру из меню: продолжает ровно с того места, где жизнь остановилась */
   function enterGame() {
     if (modalOpen) return;
+    const entered0 = entered;
     menuOpen = false; entered = true;
     $('menuLay').hidden = true;
     pulse(document.querySelector('.app'), 'enter');
+    /* первая жизнь ещё не начата (сохранения нет): сценарии, купленные в магазине меню, предлагаются сразу */
+    if (!entered0 && !hasSave && S.life === 1 && S.month === 0 && !S.scOptions && C.ownedScenarios(M.owned).length) S = C.newState(null, 1, null, C.ownedScenarios(M.owned));
     const gone = away;
     away = 0;
     save();
     if (S.status !== 'playing') endLife();
     else if (!M.seenHelp) showHelp();
-    else if (S.traitOptions) openTrait();
+    else if (openStart()) { /* выбор старта или черты */ }
     else if (maybeMillion()) { /* окно первого миллиона */ }
     else if (S.fork) openFork();
     else if (!catchUp(gone)) schedule(600);
@@ -1633,7 +1783,7 @@
     }).join('');
   }
   function openStore() {
-    if (storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
     if (!menuOpen && S.status !== 'playing') return;
     storeFrom = menuOpen ? 'menu' : 'game';
     clearTimeout(timer);
@@ -1654,7 +1804,7 @@
     if (maybeMillion()) return;
     const gone = away;
     away = 0;
-    if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else if (!catchUp(gone)) schedule(300);
+    if (openStart()) return; if (S.fork) openFork(); else if (!catchUp(gone)) schedule(300);
   }
   function storeBuy(id) {
     if (payOpen || !C.STORE[id] || M.owned.includes(id)) return;
@@ -1745,8 +1895,8 @@
     } else {
       const gone = hiddenAt ? Date.now() - hiddenAt : 0;
       hiddenAt = null;
-      if (menuOpen || storeOpen) { if (entered) away += gone; }
-      else if (!modalOpen && !forkOpen && !chargeOpen && !traitOpen && !catchUp(gone)) schedule();
+      if (menuOpen || storeOpen || autoOpen) { if (entered) away += gone; }
+      else if (!modalOpen && !forkOpen && !chargeOpen && !traitOpen && !scOpen && !catchUp(gone)) schedule();
     }
   });
   window.addEventListener('pagehide', save);
@@ -1756,7 +1906,6 @@
   let returning = false;
   if (saved && saved.M && typeof saved.M === 'object') {
     M = Object.assign(freshMeta(), saved.M);
-    if (!SPEEDS.includes(M.speed)) M.speed = 1;
     if (!Array.isArray(M.log)) M.log = [];
     if (!TABS.includes(M.tab)) M.tab = 'shop';
     if (!Array.isArray(M.goals)) M.goals = [];
@@ -1768,6 +1917,8 @@
     M.sound = M.sound === true; M.auto = M.auto !== false; M.seenHelp = M.seenHelp === true;
     M.perks = C.normPerks(M.perks);
     M.owned = C.normOwned(M.owned);
+    if (!speeds().includes(M.speed)) M.speed = 1;
+    M.autobuy = C.normAuto(M.autobuy);
     M.look = C.normLook(saved.M.look, M.owned, M.theme); /* до слотов тема лежала в M.theme */
     delete M.theme;
   }
@@ -1776,6 +1927,8 @@
   const oldPts = saved && saved.S && saved.S.v < 6 && typeof saved.S.legacy === 'number' && isFinite(saved.S.legacy) ? Math.max(0, Math.round(saved.S.legacy)) : 0;
   if (saved && validState(C.migrate(saved.S))) {
     S = saved.S;
+    /* в окне старта только купленные сценарии: чужой в сохранении не предлагается */
+    if (S.scOptions) { const own = C.ownedScenarios(M.owned); S.scOptions = S.scOptions.filter((id) => id === C.SC_BASE || own.includes(id)); if (S.scOptions.length < 2) S.scOptions = null; }
     M.pts += oldPts;
     away = saved.t ? Date.now() - saved.t : 0;
     bootT = saved.t || Date.now();
@@ -1798,6 +1951,8 @@
     state: () => S,
     meta: () => JSON.parse(JSON.stringify(M)),
     refresh: () => { render(); save(); },
+    autoLast: () => lastAuto.map((b) => b.kind),
+    autoStep: () => { autoStep(); render(); },
     skip(n) {
       for (let i = 0; i < n && S.status === 'playing'; i++) C.spin(S, Math.random, { auto: true });
       render(); save();

@@ -476,7 +476,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, KEY);
   await p.reload(); await enter(p);
   s = await st(p);
-  ok('старое сохранение продолжилось с колодой', s.v === 8 && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
+  ok('старое сохранение продолжилось с колодой', s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
   await p.close();
 
   /* 10. Хранилище запрещено */
@@ -598,7 +598,8 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const theme = (q) => q.evaluate(() => document.documentElement.dataset.theme || 'base');
   ok('в меню есть «Магазин» и честная строка про покупки', await p.locator('#menuStore').isVisible() && /деньги не списываются/.test(await p.textContent('.menu-foot')) && !/Настоящих денег в игре нет/.test(await p.textContent('#menuLay')));
   await p.click('#menuStore');
-  ok('магазин открывается из меню: три полки, десять товаров, цены «тест»', await p.locator('#storeLay').isVisible() && (await p.locator('.store-shelf').count()) === 3 && (await p.locator('[data-buy]').count()) === 10 && (await p.locator('[data-buy] span').allTextContents()).every((t) => t === 'тест'));
+  const NIDS = await p.evaluate(() => [Core.STORE_SHELVES.length, Core.STORE_IDS.length]);
+  ok(`магазин открывается из меню: ${NIDS[0]} полки, ${NIDS[1]} товаров, цены «тест»`, await p.locator('#storeLay').isVisible() && (await p.locator('.store-shelf').count()) === NIDS[0] && (await p.locator('[data-buy]').count()) === NIDS[1] && (await p.locator('[data-buy] span').allTextContents()).every((t) => t === 'тест'));
   ok('«Внешний вид»: четыре свёрнутые группы — тема, герой, дом, эпитафия, в каждой стандартный вариант выбран', JSON.stringify(await p.evaluate(() => Array.from(document.querySelectorAll('.store-group')).map((d) => d.dataset.group + (d.open ? '+' : '') + ':' + d.querySelectorAll('li').length))) === '["theme:3","hero:3","home:3","epitaph:3"]'
     && (await p.locator('[data-pick$=":base"]:disabled').count()) === 4);
   await p.evaluate(() => document.querySelectorAll('.store-group').forEach((d) => { d.open = true; }));
@@ -618,14 +619,18 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.evaluate(() => { window.z2m.pay = null; });
   const ALLIDS = await p.evaluate(() => Core.STORE_IDS);
   for (const id of ALLIDS) { await p.click(`[data-buy="${id}"]`); await p.click('#payOk'); await p.waitForTimeout(50); }
-  ok('все десять товаров покупаются через заглушку', JSON.stringify(await owned(p)) === JSON.stringify(ALLIDS) && (await p.locator('[data-buy]').count()) === 0 && (await p.locator('[data-pick]').count()) === 12);
+  ok('все товары покупаются через заглушку', JSON.stringify(await owned(p)) === JSON.stringify(ALLIDS) && (await p.locator('[data-buy]').count()) === 0 && (await p.locator('[data-pick]').count()) === 12);
   await p.evaluate(() => { window.z2m.payRestore = ['thanks', 'nope']; });
   await p.click('#storeRestore');
-  ok('«Восстановить покупки» не дарит лишнего и не дублирует', /Новых покупок не найдено/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 10);
+  ok('«Восстановить покупки» не дарит лишнего и не дублирует', /Новых покупок не найдено/.test(await p.textContent('#storeNote')) && (await owned(p)).length === ALLIDS.length);
   await p.click('#storeClose');
   ok('магазин закрывается в один тап, в меню видна благодарность', !(await p.locator('#storeLay').isVisible()) && await p.locator('#menuThanks').isVisible() && /ничего не меняет в игре/i.test(await p.evaluate(() => Core.STORE.thanks.note)));
   /* темы меняют только цвета: ни одна рамка не сдвигается */
   await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn');
+  /* сценарии куплены до первого входа: первая жизнь начинается с выбора старта */
+  await p.waitForTimeout(300);
+  ok('купленные до первого входа сценарии предложены в первой жизни', await p.locator('#scLay').isVisible() && (await p.locator('#scOpts [data-sc]').count()) === 4);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="base"]'); await p.waitForTimeout(200);
   await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
   const boxes = () => p.evaluate(() => ['.stage', '.scene-wrap', '.hud', '.slot', '.desk', '.tabs', '.ctrl', '#spinBtn', '#money', '.chips', '.focus', '#reels', '#storeBtn']
     .concat(Array.from(document.querySelectorAll('#shop li')).map((li) => `#shop li[data-kind="${li.dataset.kind}"]`))
@@ -650,18 +655,18 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('косметика не двигает ни одной рамки', (await boxes()) === bx0 && sc1.box === sc0.box);
   /* покупки переживают перезагрузку, новую жизнь и «Новую игру» */
   await p.reload(); await enter(p);
-  ok('после перезагрузки покупки и выбор на месте', (await owned(p)).length === 10 && (await theme(p)) === 'dusk' && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && /#FF5A7A/.test(await p.evaluate(() => document.getElementById('charBody').innerHTML)));
+  ok('после перезагрузки покупки и выбор на месте', (await owned(p)).length === ALLIDS.length && (await theme(p)) === 'dusk' && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && /#FF5A7A/.test(await p.evaluate(() => document.getElementById('charBody').innerHTML)));
   await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.traitOptions = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
   await p.waitForTimeout(300);
   ok('экран проигрыша: купленное оформление эпитафии показано', await p.locator('#modalBox .chron[data-ep="paper"] .epitaph').isVisible());
   ok('экран проигрыша: ни входа в магазин, ни упоминаний покупок', (await p.textContent('#modalTitle')) === '65 лет. Время вышло' && !/магазин|покуп|купить|реклам|тест/i.test(await p.textContent('#modalBox')) && (await p.evaluate(() => getComputedStyle(document.getElementById('storeBtn')).visibility)) === 'hidden' && await p.locator('#storeBtn').isDisabled(), await p.textContent('#modalBox'));
   await p.waitForTimeout(450); await p.click('#modalBtn');
-  ok('новая жизнь: покупки и выбор на месте', (await st(p)).life === 2 && (await owned(p)).length === 10 && (await look(p)).hero === 'street');
+  ok('новая жизнь: покупки и выбор на месте', (await st(p)).life === 2 && (await owned(p)).length === ALLIDS.length && (await look(p)).hero === 'street');
   await p.evaluate(() => { const s = window.z2m.state(); s.traitOptions = null; document.getElementById('traitLay').hidden = true; });
   await p.reload();
   await p.waitForSelector('#menuNew', { state: 'visible' });
   await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
-  ok('«Новая игра» стирает жизнь, но не покупки и выбор', (await st(p)).life === 1 && (await owned(p)).length === 10 && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && (await theme(p)) === 'dusk');
+  ok('«Новая игра» стирает жизнь, но не покупки и выбор', (await st(p)).life === 1 && (await owned(p)).length === ALLIDS.length && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && (await theme(p)) === 'dusk');
   await p.close();
 
   /* Косметика не меняет ни одного числа: одна и та же жизнь с одной очередью случайностей со стандартным набором
@@ -682,6 +687,173 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const plain = await lifeWith({ seenHelp: true, auto: false });
   const dressed = await lifeWith({ seenHelp: true, auto: false, owned: ALLIDS, look: { theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'postcard' } });
   ok('косметика не меняет ни одного числа: жизнь со всем выбранным совпадает со стандартной до поля', plain.r === dressed.r && dressed.lk.hero === 'curls' && dressed.lk.home === 'terra' && JSON.parse(plain.r).month >= 300, plain.r === dressed.r ? '' : 'расходятся');
+
+  /* 16. Удобство: скорость ×8 и автопокупки есть только у владельца и считают ту же жизнь */
+  p = await mk();
+  await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
+  const speedRound = async (q) => { const out = []; for (let i = 0; i < 4; i++) { await q.click('#speedBtn'); out.push(await q.textContent('#speedBtn')); } return out; };
+  const HINT = /×\s?8|автопокуп/i;
+  const bodyText = (q) => q.evaluate(() => document.body.innerText);
+  ok('без покупки: скорость ×1 → ×2 → ×4 → ×1, четвёртого положения нет', JSON.stringify(await speedRound(p)) === '["×2","×4","×1","×2"]');
+  await p.click('#speedBtn'); await p.click('#speedBtn');
+  await p.click('#tabBtn-shop');
+  ok('без покупки: в «Покупках» нет строки автопокупок и ни одного намёка на них и на ×8', !(await p.locator('#autoBar').isVisible()) && !HINT.test(await bodyText(p)));
+  await p.click('#menuBtn'); await p.waitForTimeout(200);
+  ok('без покупки: в меню тоже ни слова', await p.locator('#menuLay').isVisible() && !HINT.test(await bodyText(p)));
+  await p.click('#menuStore');
+  for (const id of ['speed8', 'autobuy']) { await p.click(`[data-buy="${id}"]`); await p.click('#payCancel'); }
+  await p.click('#storeClose'); await p.click('#menuPlay'); await p.waitForTimeout(300);
+  ok('отказ от «Удобства»: ничего не куплено, скорость по-прежнему до ×4, строки автопокупок нет', (await owned(p)).length === 0 && JSON.stringify(await speedRound(p)) === '["×2","×4","×1","×2"]' && !(await p.locator('#autoBar').isVisible()));
+  await p.click('#speedBtn'); await p.click('#speedBtn');
+  await p.click('#storeBtn');
+  ok('«Удобство» в магазине: две вещи, у автопокупок сказано, что они покупают то же по тем же ценам', /Скорость ×8/.test(await p.textContent('[data-item="speed8"]')) && /то же, что купил бы ты, по тем же ценам/.test(await p.textContent('[data-item="autobuy"]')));
+  for (const id of ['speed8', 'autobuy']) { await p.click(`[data-buy="${id}"]`); await p.click('#payOk'); await p.waitForTimeout(50); }
+  await p.click('#storeClose');
+  ok('после покупки: ×8 появилось четвёртым положением', JSON.stringify(await speedRound(p)) === '["×2","×4","×8","×1"]');
+  await p.click('#tabBtn-shop');
+  const am = (await meta(p)).autobuy;
+  ok('после покупки: строка автопокупок в «Покупках», по умолчанию всё выключено', await p.locator('#autoBar').isVisible() && /выключены/.test(await p.textContent('#autoBar')) && am.on === false && am.job === false && Object.values(am.kinds).every((v) => v === false));
+  await p.click('#autoEdit');
+  ok('окно «Автопокупки» открывается: главный выключатель, запас и девять правил', await p.locator('#autoLay').isVisible() && (await p.locator('#autoList button').count()) === 9 && (await p.locator('#autoRes button').count()) === 3);
+  await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') !== 'true') document.getElementById('autoBtn').click(); });
+  const mOpen = (await st(p)).month; await p.waitForTimeout(1500);
+  ok('пока окно открыто, месяц стоит', (await st(p)).month === mOpen);
+  await p.click('#autoMain'); await p.click('[data-rule="gym"]'); await p.click('[data-rule="job"]'); await p.click('[data-res="4"]');
+  await p.click('#autoClose');
+  await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
+  const rules = (m) => JSON.stringify([m.autobuy.on, m.autobuy.job, m.autobuy.kinds.gym, m.autobuy.kinds.home, m.autobuy.reserve]);
+  ok('правила сохраняются: включено, спортзал и повышение, запас ×4', /2 правила · запас ×4/.test(await p.textContent('#autoBar')) && rules(await meta(p)) === '[true,true,true,false,4]', await p.textContent('#autoBar'));
+  await p.click('#autoToggle');
+  ok('выключаются в одно касание', (await meta(p)).autobuy.on === false && /выключены/.test(await p.textContent('#autoBar')));
+  await p.click('#autoToggle');
+  for (let i = 0; i < 3; i++) await p.click('#speedBtn');
+  ok('×8 выбрано', (await meta(p)).speed === 8);
+  await p.reload(); await enter(p);
+  ok('после перезагрузки: ×8 и правила на месте', (await meta(p)).speed === 8 && rules(await meta(p)) === '[true,true,true,false,4]');
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.traitOptions = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  ok('экран проигрыша у владельца: ни магазина, ни автопокупок, ни ×8', (await p.textContent('#modalTitle')) === '65 лет. Время вышло' && !/магазин|покуп|купить|реклам|тест|×\s?8/i.test(await p.textContent('#modalBox')), await p.textContent('#modalBox'));
+  await p.waitForTimeout(450); await p.click('#modalBtn');
+  ok('новая жизнь: покупки и правила на месте', (await st(p)).life === 2 && (await owned(p)).includes('autobuy') && rules(await meta(p)) === '[true,true,true,false,4]');
+  await p.evaluate(() => { const s = window.z2m.state(); s.traitOptions = null; document.getElementById('traitLay').hidden = true; });
+  await p.reload();
+  await p.waitForSelector('#menuNew', { state: 'visible' });
+  await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
+  ok('«Новая игра» не стирает «Удобство», правила и скорость', (await st(p)).life === 1 && (await owned(p)).includes('speed8') && (await meta(p)).speed === 8 && rules(await meta(p)) === '[true,true,true,false,4]');
+  await p.close();
+
+  /* «Пока тебя не было» автопокупки не делают: догонялка идёт без них */
+  {
+    const ALL = { on: true, reserve: 3, job: true, kinds: { gym: true, home: true, asset: true, reel: true } };
+    const q1 = await mk(null, 'menu', { content: `if (!sessionStorage.getItem('z2m-a1')) { sessionStorage.setItem('z2m-a1', '1'); localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify({ M: { seenHelp: true, auto: false, owned: ['autobuy'], autobuy: ALL } }))}); }` });
+    await q1.waitForSelector('#menuPlay', { state: 'visible' }); await q1.click('#menuPlay'); await q1.waitForTimeout(300);
+    await q1.evaluate(() => { const s = window.z2m.state(); Object.assign(s, { money: 50000, peak: 50000, ms: 9, fork: null, traitOptions: null, health: 40 }); window.z2m.refresh(); });
+    const saved = await q1.evaluate((k) => { const v = JSON.parse(localStorage.getItem(k)); v.t = Date.now() - 30 * 60000; v.M.auto = true; return JSON.stringify(v); }, KEY);
+    const before = JSON.parse(saved).S;
+    await q1.context().close();
+    const q = await mk(null, 'menu', { content: `if (!sessionStorage.getItem('z2m-a2')) { sessionStorage.setItem('z2m-a2', '1'); localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(saved)}); }` });
+    await q.waitForSelector('#menuPlay', { state: 'visible' }); await q.click('#menuPlay'); await q.waitForTimeout(300);
+    const r = await q.evaluate(() => { const s = window.z2m.state(); return { title: document.getElementById('modalTitle').textContent, shown: !document.getElementById('overlay').hidden, log: window.z2m.meta().log.map((e) => e.text), month: s.month, job: s.job, home: s.home, assets: JSON.stringify(s.assets) }; });
+    ok('«Пока тебя не было»: год прошёл без автопокупок', r.shown && r.title === 'Пока тебя не было' && r.month === before.month + 12 && !r.log.some((t) => /Автопокупка/.test(t)) && r.home === before.home && r.assets === JSON.stringify(before.assets), JSON.stringify(r).slice(0, 300));
+    await q.context().close();
+  }
+
+  /* Одна и та же очередь случайностей: ×1 и ×8 дают одну жизнь; автопокупки равны тем же ручным нажатиям */
+  const seeded = `let a = 20261124; Math.random = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };`;
+  const lifePage = async (M) => {
+    const q = await mk(null, 'menu', { content: `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify({ M }))});` });
+    await q.waitForSelector('#menuPlay', { state: 'visible' });
+    await q.click('#menuPlay'); await q.waitForTimeout(200);
+    await q.evaluate(seeded);
+    await q.click('#tabBtn-shop');
+    return q;
+  };
+  /* один месяц ручным нажатием «Крутить», потом окна развилки, черты и событий закрываются одним и тем же выбором */
+  const oneMonth = async (q, forks) => {
+    const m = (await st(q)).month;
+    await q.click('#spinBtn');
+    await q.waitForFunction((mm) => window.z2m.state().month > mm, m, { timeout: 15000 });
+    for (let k = 0; k < 40; k++) {
+      await q.waitForTimeout(k ? 150 : 60);
+      const w = await q.evaluate(() => ({ fork: !document.getElementById('forkLay').hidden, trait: !document.getElementById('traitLay').hidden, modal: !document.getElementById('overlay').hidden, f: !!window.z2m.state().fork, t: !!window.z2m.state().traitOptions }));
+      if (w.fork) { forks.n++; await q.waitForTimeout(450); await q.click('#forkB'); continue; }
+      if (w.trait) { await q.waitForTimeout(450); await q.locator('#traitOpts button').first().click(); continue; }
+      if (w.modal) { await q.waitForTimeout(450); await q.click('#modalBtn'); continue; }
+      if (!w.f && !w.t && k > 3) break;
+    }
+  };
+  const runLife = async (M, n, between) => {
+    const q = await lifePage(M), forks = { n: 0 }, trail = [];
+    for (let i = 0; i < n && (await st(q)).status === 'playing'; i++) {
+      await oneMonth(q, forks);
+      if (between) await between(q, i);
+      trail.push(JSON.stringify(await st(q)));
+    }
+    await q.context().close();
+    return { trail, forks: forks.n };
+  };
+  const N8 = 30;
+  const slow = await runLife({ seenHelp: true, auto: false, speed: 1 }, N8);
+  const quick = await runLife({ seenHelp: true, auto: false, speed: 8, owned: ['speed8'] }, N8);
+  const diff = slow.trail.findIndex((x, i) => x !== quick.trail[i]);
+  ok(`×1 и ×8 при одной очереди случайностей: ${N8} месяцев совпадают до поля`, diff === -1 && slow.trail.length === N8 && quick.trail.length === N8, diff === -1 ? `развилок: ${slow.forks}` : `расходятся с месяца ${diff + 1}`);
+  ok('на ×8 развилки открываются так же', quick.forks === slow.forks && quick.forks > 0, `развилок ${quick.forks} и ${slow.forks}`);
+
+  const NA = 120, ALL_AUTO = { on: true, reserve: 3, job: true, kinds: Object.fromEntries(['gym', 'home', 'asset', 'reel', 'up:mult', 'up:star', 'up:insure', 'up:coach'].map((k) => [k, true])) };
+  const bought = [];
+  const auto = await runLife({ seenHelp: true, auto: false, speed: 8, owned: ['speed8', 'autobuy'], autobuy: ALL_AUTO }, NA, async (q, i) => { bought[i] = await q.evaluate(() => window.z2m.autoLast()); });
+  const hand = await runLife({ seenHelp: true, auto: false, speed: 8, owned: ['speed8'] }, NA, async (q, i) => {
+    for (const k of bought[i] || []) await q.evaluate((kind) => document.querySelector(`#shop li[data-kind="${kind.replace(':', '-')}"] .btn-buy`).click(), k);
+  });
+  const nb = bought.flat();
+  const ad = auto.trail.findIndex((x, i) => x !== hand.trail[i]);
+  ok(`автопокупки равны ручным нажатиям тех же покупок в те же месяцы: ${NA} месяцев совпадают до поля`, ad === -1 && auto.trail.length === hand.trail.length && nb.length > 5, ad === -1 ? `автопокупок ${nb.length}: ${[...new Set(nb)].join(', ')}` : `расходятся с месяца ${ad + 1}`);
+  ok('автопокупки не уводят деньги в минус', auto.trail.every((x) => JSON.parse(x).money >= 0));
+
+  /* 17. Новые жизни: платные сценарии старта видны только купленные, колоду и шансы не меняют, на экране проигрыша их нет */
+  p = await mk();
+  ok('без покупки: окна выбора старта нет', !(await p.locator('#scLay').isVisible()) && (await st(p)).scOptions === null && (await st(p)).sc === 'base');
+  await p.click('#storeBtn');
+  const livesText = await p.evaluate(() => [...document.querySelectorAll('.store-shelf')].find((x) => /Новые жизни/.test(x.querySelector('h3').textContent)).textContent);
+  const scNames = await p.evaluate(() => ['sc-loan', 'sc-late', 'sc-flat'].map((id) => Core.STORE[id].name));
+  ok('полка «Новые жизни»: три сценария, у каждого сказано, что колода, шансы и цены те же', scNames.every((n) => livesText.includes(n)) && (livesText.match(/Колода, шансы, выплаты и цены те же/g) || []).length === 3, livesText.slice(0, 200));
+  await p.click('[data-buy="sc-late"]'); await p.click('#payCancel');
+  await p.click('[data-buy="sc-loan"]'); await p.click('#payOk'); await p.waitForTimeout(50);
+  await p.click('#storeClose'); await p.waitForTimeout(200);
+  ok('куплен один сценарий, отказ от второго ничего не купил, текущая жизнь не тронута', JSON.stringify(await owned(p)) === '["sc-loan"]' && (await st(p)).scOptions === null && !(await p.locator('#scLay').isVisible()));
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  const lossText = await p.textContent('#modalBox');
+  ok('проигрыш у владельца сценария: в окне нет ни сценариев, ни магазина, только новая жизнь и опыт', (await p.locator('#overlay .modal button:visible').count()) === 2 && !/Студент|Второй шанс|однушк|Новые жизни|магазин|реклам/i.test(lossText), lossText.slice(0, 160));
+  await p.waitForTimeout(450); await p.click('#modalBtn'); await p.waitForTimeout(200);
+  let s17 = await st(p);
+  ok('новая жизнь: сначала выбор старта, черта ждёт', await p.locator('#scLay').isVisible() && !(await p.locator('#traitLay').isVisible()) && JSON.stringify(s17.scOptions) === '["base","loan"]' && Array.isArray(s17.traitOptions));
+  ok('в окне только стандартный старт и купленный сценарий', JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('#scOpts [data-sc]')].map((b) => b.dataset.sc))) === '["base","loan"]');
+  await p.waitForTimeout(1800);
+  await p.evaluate(() => document.getElementById('spinBtn').click()); await p.waitForTimeout(300);
+  ok('пока старт не выбран, слот стоит даже по нажатию «Крутить»', (await st(p)).month === 0 && (await st(p)).scOptions !== null);
+  await p.reload(); await enter(p);
+  ok('выбор старта возвращается после перезагрузки', await p.locator('#scLay').isVisible());
+  const deck0 = JSON.stringify((await st(p)).deck);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="loan"]'); await p.waitForTimeout(200);
+  s17 = await st(p);
+  const L = await p.evaluate(() => Core.SCENARIOS.loan);
+  ok('сценарий применён: возраст, долг, навык; колода та же; дальше выбор черты', s17.sc === 'loan' && s17.scOptions === null && 18 + Math.floor(s17.month / 12) === L.age && s17.money < 0 && s17.skill >= L.skill && JSON.stringify(s17.deck) === deck0 && await p.locator('#traitLay').isVisible() && !(await p.locator('#scLay').isVisible()), JSON.stringify({ m: s17.month, money: s17.money, skill: s17.skill }));
+  ok('вступление сценария в ленте', (await meta(p)).log.some((e) => e.text === L.intro));
+  await p.waitForTimeout(450); await p.locator('#traitOpts button').first().click(); await p.waitForTimeout(200);
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  ok('эпитафия сценарной жизни начинается с её истории', ((await p.textContent('#modalBody .epitaph')) || '').startsWith(L.epi), await p.textContent('#modalBody .epitaph'));
+  await p.waitForTimeout(450); await p.click('#modalBtn'); await p.waitForTimeout(200);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="base"]'); await p.waitForTimeout(200);
+  s17 = await st(p);
+  ok('стандартный старт ничего не меняет', s17.sc === 'base' && s17.month === 0 && s17.money === (await p.evaluate(() => Core.newState(window.z2m.state().perks, 3).money)) && s17.skill === 0 && await p.locator('#traitLay').isVisible());
+  await p.evaluate(() => { window.z2m.state().traitOptions = null; });
+  await p.reload();
+  await p.waitForSelector('#menuNew', { state: 'visible' });
+  await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
+  ok('«Новая игра»: покупка на месте, первая жизнь тоже начинается с выбора старта', (await st(p)).life === 1 && JSON.stringify(await owned(p)) === '["sc-loan"]' && await p.locator('#scLay').isVisible() && !(await p.locator('#traitLay').isVisible()));
+  await p.close();
 
   /* 11. Бонусы за рекламу: звезда, скидка, лимит на жизнь, четвёртая черта, честные подписи */
   p = await mk();

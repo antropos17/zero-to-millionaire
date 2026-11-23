@@ -112,6 +112,13 @@ policies['casual+ad'] = Object.assign({}, policies.casual, { ads: true });
 policies['smart+ad'] = Object.assign({}, policies.smart, { ads: true, adPlan: true });
 /* берёт золотой вариант в каждой развилке, где он есть */
 policies.allgold = Object.assign({}, policies.smart, { ads: true, fork: () => 0 });
+/* Автопокупки (товар «Автопокупки»): все правила включены, запас RESERVE (по умолчанию наименьший из Core.AUTO_RESERVES), повышение тоже (AUTO_NOJOB=1 — без него).
+   В игре автопокупка срабатывает после спина; здесь — в начале хода, то есть после спина прошлого месяца. */
+const AUTO_ALL = { on: true, reserve: +process.env.RESERVE || Core.AUTO_RESERVES[0], job: !process.env.AUTO_NOJOB, kinds: Object.fromEntries(Core.AUTO_KINDS.map((k) => [k, !(process.env.AUTO_SKIP || '').split(',').includes(k)])) };
+/* ничего не нажимает сам, но включил все автопокупки; от развилок отказывается, фокус «Работа» */
+policies.autoidle = { turn(s) { Core.autoBuy(s, AUTO_ALL); }, fork: () => 1 };
+/* только держит фокус на Учёбе, пока есть следующая должность (потом Работа), и включил все автопокупки */
+policies.autostudy = { turn(s) { Core.setFocus(s, Core.nextJob(s) ? 'study' : 'work'); Core.autoBuy(s, AUTO_ALL); }, fork: () => 1 };
 
 const PERK_SETS = { 0: {}, 1: { genes: 2, cash: 2, school: 1, tough: 1, sale: 1, ties: 1 }, 2: { cash: 4, genes: 5, tough: 3, ties: 3, school: 3, sale: 3, star: 1, traits: 2, joker: 1 } };
 const STAY = !!process.env.STAY;
@@ -133,7 +140,9 @@ function adTurn(p, s) {
 }
 function run(name, legacy, seed, life) {
   const rng = mulberry(seed), p = policies[name];
-  const s = Core.newState(PERK_SETS[legacy], life || 1, rng);
+  const s = Core.newState(PERK_SETS[legacy], life || 1, rng, process.env.SC ? [process.env.SC] : null);
+  /* SC=<сценарий>: жизнь начинается с этого старта (полка «Новые жизни»), выбор — до черты, как в игре */
+  if (s.scOptions) Core.pickScenario(s, process.env.SC);
   if (s.traitOptions && p.ads && !process.env.ADS_OLD) Core.extraTrait(s, rng);
   if (s.traitOptions) Core.pickTrait(s, p.trait ? p.trait(s.traitOptions) : s.traitOptions[0]);
   let forks = 0, charges = 0;
@@ -141,6 +150,8 @@ function run(name, legacy, seed, life) {
     if (s.wonAt != null && !STAY) { Core.retire(s); break; }
     adTurn(p, s);
     p.turn(s);
+    /* SPEND=1 вместе со STAY=1: после миллиона бот докупает жильё, как игрок, который играет дальше (боты сами перестают покупать около $600–700 тыс.) */
+    if (STAY && process.env.SPEND && s.wonAt != null) while (Core.act(s, 'home'));
     if (p.ads && Core.boostReady(s)) Core.startBoost(s);
     const pick = p.charge && Core.canCharge(s) ? p.charge(s) : null;
     if (pick) charges++;
@@ -218,6 +229,6 @@ if (!process.env.ONLY) {
 }
 for (const p of (process.env.ONLY ? [process.env.ONLY] : ['afk', 'lazy', 'nofocus', 'casual', 'smart', 'casual+ad', 'smart+ad', 'allgold'])) for (const [l, life] of p === 'afk' ? [[0, 1]] : (process.env.L ? [[+process.env.L, +process.env.LIFE || 2]] : [[0, 1], [1, 2], [2, 2]])) {
   const g = report(p, l, life);
-  if (process.argv.includes('--goals') && (p === 'casual' || p === 'smart') && life === 1) console.log('   цели, % жизней:', Core.GOALS.map((x) => `${x.id} ${Math.round((g[x.id] || 0) / 6)}`).join('  '));
+  if (process.argv.includes('--goals') && (p === 'casual' || p === 'smart') && life === 1 || process.argv.includes('--goals-all')) console.log('   цели, % жизней:', Core.GOALS.map((x) => `${x.id} ${Math.round((g[x.id] || 0) / 6)}`).join('  '));
 }
 if (process.argv.includes('--trace')) { trace('smart', 0, 7); trace('casual', 0, 7); trace('lazy', 0, 7); }

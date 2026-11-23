@@ -57,6 +57,8 @@ const Core = (() => {
      slot + value: какой вариант внешнего вида открывает товар (слоты — LOOK_SLOTS) */
   const STORE_SHELVES = [
     { id: 'noads', name: 'Без рекламы' },
+    { id: 'comfort', name: 'Удобство' },
+    { id: 'lives', name: 'Новые жизни' },
     { id: 'look', name: 'Внешний вид' },
     { id: 'support', name: 'Поддержать автора' },
   ];
@@ -71,6 +73,11 @@ const Core = (() => {
   const LOOK_SLOT_IDS = LOOK_SLOTS.map((sl) => sl.id);
   const STORE = {
     noads: { shelf: 'noads', name: 'Без рекламы', note: 'Бонусы за рекламу сразу, без ролика. Сами бонусы и их ограничения те же', once: true },
+    speed8: { shelf: 'comfort', name: 'Скорость ×8', note: 'Четвёртое положение переключателя скорости. Месяцы и шансы те же, только идут быстрее', once: true },
+    autobuy: { shelf: 'comfort', name: 'Автопокупки', note: 'Покупает то же, что купил бы ты, по тем же ценам, когда хватает денег с запасом. Фокус, развилки, звезду и колоду не трогает', once: true },
+    'sc-loan': { shelf: 'lives', name: 'Жизнь «Студент с кредитом»', note: '', once: true, scenario: 'loan' },
+    'sc-late': { shelf: 'lives', name: 'Жизнь «Поздний старт»', note: '', once: true, scenario: 'late' },
+    'sc-flat': { shelf: 'lives', name: 'Жизнь «Бабушкина однушка»', note: '', once: true, scenario: 'flat' },
     'theme-bill': { shelf: 'look', name: 'Тема «Зелёная купюра»', note: 'Цвета интерфейса: зелёный и тёмно-зелёный', once: true, slot: 'theme', value: 'bill' },
     'theme-dusk': { shelf: 'look', name: 'Тема «Вечер на вилле»', note: 'Цвета интерфейса: фиолетовый и сливовый', once: true, slot: 'theme', value: 'dusk' },
     'hero-street': { shelf: 'look', name: 'Облик «Двор»', note: 'Вязаная шапка, яркие кеды и тёмные джинсы', once: true, slot: 'hero', value: 'street' },
@@ -82,6 +89,37 @@ const Core = (() => {
     thanks: { shelf: 'support', name: 'Спасибо автору', note: 'Ничего не меняет в игре. В меню появится отметка благодарности', once: true },
   };
   const STORE_IDS = Object.keys(STORE);
+
+  /* Сценарии старта жизни (полка «Новые жизни»). Меняют только стартовый расклад: возраст, деньги (в том числе долг),
+     навык, здоровье, связи, жильё и должность. Колоду, шансы символов, множители, выплаты и цены не трогают.
+     money, skill и network прибавляются к стартовым (наследие действует как обычно); job и home — не ниже указанного;
+     health — стартовое здоровье. Числа подобраны ботами так, чтобы сценарий не был легче стандартной жизни
+     (раздел «Сценарии старта» в docs/BALANCE-REPORT.md). */
+  const SC_BASE = 'base';
+  const SCENARIOS = {
+    loan: {
+      name: 'Студент с кредитом', age: 22, money: -12000, skill: 55, health: 60, network: 2, home: 0, job: 0,
+      note: 'Старт в 22 года: навык 55, но долг $12 000 за учёбу и здоровье 60',
+      intro: 'Тебе 22: диплом, навык 55, здоровье 60 после сессий и $12 000 студенческого кредита.',
+      epi: 'Начал с диплома и кредита за учёбу.',
+    },
+    late: {
+      name: 'Поздний старт', age: 26, money: 15000, skill: 60, health: 55, network: 6, home: 1, job: 0,
+      note: 'Старт в 26 лет: $15 000, навык 60, связи 6, койка в хостеле, здоровье 55',
+      intro: 'Тебе 26: восемь лет ушли не туда. Есть $15 000, навык 60 и пара знакомых. Начинаешь заново.',
+      epi: 'Начал заново в 26.',
+    },
+    flat: {
+      name: 'Бабушкина однушка', age: 24, money: -12000, skill: 30, health: 60, network: 3, home: 3, job: 0,
+      note: 'Старт в 24 года в своей однушке, но с долгом $12 000 за неё',
+      intro: 'Тебе 24: бабушка оставила однушку и $12 000 долга за неё.',
+      epi: 'Начал с бабушкиной однушки и её долга.',
+    },
+  };
+  const SC_IDS = Object.keys(SCENARIOS);
+  for (const id of STORE_IDS) if (STORE[id].scenario) STORE[id].note = SCENARIOS[STORE[id].scenario].note + '. Колода, шансы, выплаты и цены те же';
+  /* какие сценарии открыты покупками: id сценариев в порядке каталога */
+  const ownedScenarios = (owned) => STORE_IDS.filter((id) => STORE[id].scenario && Array.isArray(owned) && owned.includes(id)).map((id) => STORE[id].scenario);
   const THEME_BASE = LOOK_BASE;
   /* все варианты слота: стандартный и те, что открывают товары */
   const lookValues = (slot) => [LOOK_BASE].concat(STORE_IDS.filter((id) => STORE[id].slot === slot).map((id) => STORE[id].value));
@@ -102,6 +140,18 @@ const Core = (() => {
   const ownsTheme = (owned, theme) => ownsLook(owned, 'theme', theme);
   const normTheme = (theme, owned) => normLook({ theme }, owned).theme;
   const noAds = (owned) => normOwned(owned).includes('noads');
+  /* Автопокупки (товар autobuy): правила игрока, лежат в метаданных между жизнями.
+     on: общий выключатель; reserve: покупать, когда денег не меньше цены × запас; job: брать бесплатное повышение;
+     kinds: какие покупки вкладки «Покупки» брать. По умолчанию всё выключено.
+     Запас не ниже ×3: с ×1 и ×2 игрок, который ничего не нажимает, выигрывал заметно чаще и раньше бота nofocus
+     (docs/BALANCE-REPORT.md, раздел «Автопокупки»). */
+  const AUTO_KINDS = ['gym', 'home', 'asset', 'reel', 'up:mult', 'up:star', 'up:insure', 'up:coach'];
+  const AUTO_RESERVES = [3, 4, 5];
+  const normAuto = (a) => {
+    const src = a && typeof a === 'object' && !Array.isArray(a) ? a : {}, ks = src.kinds && typeof src.kinds === 'object' ? src.kinds : {}, kinds = {};
+    AUTO_KINDS.forEach((k) => { kinds[k] = ks[k] === true; });
+    return { on: src.on === true, reserve: AUTO_RESERVES.includes(src.reserve) ? src.reserve : AUTO_RESERVES[0], job: src.job === true, kinds };
+  };
 
   /* Богатство к концу жизни даёт дополнительный опыт */
   const WEALTH = [5000000, 25000000, 100000000];
@@ -180,10 +230,11 @@ const Core = (() => {
   };
   const TRAIT_IDS = Object.keys(TRAITS);
 
-  function newState(perks, life, rng) {
+  /* scenarios: открытые сценарии (ownedScenarios). Если есть хоть один, жизнь начинается с выбора старта */
+  function newState(perks, life, rng, scenarios) {
     const P = normPerks(perks), start = PERKS.cash.vals[P.cash];
     const s = {
-      v: 8,
+      v: 9,
       money: start, month: 0, job: 0, skill: 0, health: 100, network: PERKS.ties.vals[P.ties],
       home: 0, assets: 0,
       deck: Object.assign({}, START_DECK, { study: START_DECK.study + P.school, wild: P.joker }),
@@ -193,11 +244,14 @@ const Core = (() => {
       ads: 0, starAt: 0, saleAt: 0, sale: false, trait4: false,
       focus: 'work', fork: null, lastForks: [], ms: 0,
       trait: null, traitOptions: null,
+      sc: SC_BASE, scOptions: null,
       flags: { debt: false, low: false, yes: 0, gold: 0, sets: [], quad: false },
       perks: P, life: life || 1,
       status: 'playing', peak: start, wonAt: null, won: null, earned: 0,
       story: [],
     };
+    const scs = Array.isArray(scenarios) ? SC_IDS.filter((id) => scenarios.includes(id)) : [];
+    if (scs.length) s.scOptions = [SC_BASE].concat(scs);
     /* со второй жизни сначала выбирается черта */
     if (s.life > 1) {
       rng = rng || Math.random;
@@ -208,8 +262,28 @@ const Core = (() => {
     return s;
   }
 
+  /* Выбор старта: только в начале жизни, до первого месяца. Стандартный старт ничего не меняет */
+  function pickScenario(s, id) {
+    if (!s.scOptions || !s.scOptions.includes(id)) return false;
+    s.scOptions = null;
+    const sc = SCENARIOS[id];
+    if (!sc) return true;
+    s.sc = id;
+    s.month = (sc.age - START_AGE) * YEAR;
+    s.money += sc.money;
+    s.skill += sc.skill;
+    s.network += sc.network;
+    s.health = Math.min(100, sc.health);
+    s.home = Math.max(s.home, sc.home);
+    s.job = Math.max(s.job, sc.job);
+    s.peak = Math.max(s.peak, s.money);
+    note(s, 'start', { sc: id });
+    if (s.money < 0) { s.flags.debt = true; note(s, 'debt'); }
+    return true;
+  }
+
   function pickTrait(s, id) {
-    if (!s.traitOptions || !s.traitOptions.includes(id)) return false;
+    if (s.scOptions || !s.traitOptions || !s.traitOptions.includes(id)) return false;
     s.trait = id;
     s.traitOptions = null;
     if (TRAITS[id].apply) TRAITS[id].apply(s);
@@ -217,7 +291,7 @@ const Core = (() => {
   }
 
   /* «Четвёртая черта» за рекламу: ещё один вариант из тех черт, что не показаны. Раз за жизнь. */
-  const traitMore = (s) => !!s.traitOptions && !s.trait4 && s.ads < AD_LIMIT && TRAIT_IDS.some((id) => !s.traitOptions.includes(id));
+  const traitMore = (s) => !!s.traitOptions && !s.scOptions && !s.trait4 && s.ads < AD_LIMIT && TRAIT_IDS.some((id) => !s.traitOptions.includes(id));
   function extraTrait(s, rng) {
     if (!traitMore(s)) return false;
     rng = rng || Math.random;
@@ -259,6 +333,8 @@ const Core = (() => {
       s.ads = Math.min(AD_LIMIT, (s.flags && s.flags.gold) | 0);
       s.starAt = 0; s.saleAt = 0; s.sale = false; s.trait4 = false;
     }
+    /* до v9 сценариев не было: любая жизнь — стандартный старт */
+    if (s && s.v === 8) { s.v = 9; s.sc = SC_BASE; s.scOptions = null; }
     return s;
   }
 
@@ -402,7 +478,7 @@ const Core = (() => {
   }
 
   const chargeMax = (s) => CHARGE_NEED[s.up.star];
-  const canCharge = (s) => s.status === 'playing' && !s.fork && !s.traitOptions && s.charge >= chargeMax(s);
+  const canCharge = (s) => s.status === 'playing' && !s.fork && !s.traitOptions && !s.scOptions && s.charge >= chargeMax(s);
   const multTable = (s, lvl) => MULT_TABLES[lvl == null ? s.up.mult : lvl];
   const multMean = (s) => (s.up.mult ? multTable(s).reduce((a, r) => a + r[0] * r[1], 0) / 100 : 1);
   function rollMult(s, rng) {
@@ -1102,14 +1178,14 @@ const Core = (() => {
   /* Один спин = один месяц. opts.auto: развилки не открываются (игрока нет рядом). opts.charged: символ «Своего месяца». */
   function spin(s, rng, opts) {
     rng = rng || Math.random;
-    if (s.status !== 'playing' || s.fork || s.traitOptions) return null;
+    if (s.status !== 'playing' || s.fork || s.traitOptions || s.scOptions) return null;
     const reels = opts && opts.charged ? chargedReels(s, opts.charged, rng) : rollReels(s, rng);
     return reels ? resolve(s, reels, rng, opts) : null;
   }
 
   function resolve(s, reels, rng, opts) {
     rng = rng || Math.random;
-    if (s.status !== 'playing' || s.fork || s.traitOptions) return null;
+    if (s.status !== 'playing' || s.fork || s.traitOptions || s.scOptions) return null;
     const ev = evaluate(s, reels);
     const before = s.money;
     /* «Удачный год»: зарплата, пассив и деньги хороших событий вдвое */
@@ -1215,8 +1291,8 @@ const Core = (() => {
   /* ready: кнопку можно нажать сейчас. Сам бонус выдаётся и тогда, когда за время ролика открылась развилка:
      досмотренная реклама всегда даёт обещанное. */
   const adsLeft = (s) => Math.max(0, AD_LIMIT - s.ads);
-  const adOpen = (s) => s.status === 'playing' && !s.fork && !s.traitOptions;
-  const boostCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.boost === 0 && s.month >= s.boostAt;
+  const adOpen = (s) => s.status === 'playing' && !s.fork && !s.traitOptions && !s.scOptions;
+  const boostCan = (s) => s.status === 'playing' && !s.scOptions && s.ads < AD_LIMIT && s.boost === 0 && s.month >= s.boostAt;
   const boostReady = (s) => adOpen(s) && boostCan(s);
   function startBoost(s) {
     if (!boostCan(s)) return false;
@@ -1225,7 +1301,7 @@ const Core = (() => {
     s.ads += 1;
     return true;
   }
-  const starCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.month >= s.starAt && s.charge < chargeMax(s);
+  const starCan = (s) => s.status === 'playing' && !s.scOptions && s.ads < AD_LIMIT && s.month >= s.starAt && s.charge < chargeMax(s);
   const starReady = (s) => adOpen(s) && starCan(s);
   function chargeStar(s) {
     if (!starCan(s)) return false;
@@ -1234,7 +1310,7 @@ const Core = (() => {
     s.ads += 1;
     return true;
   }
-  const saleCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && !s.sale && s.month >= s.saleAt;
+  const saleCan = (s) => s.status === 'playing' && !s.scOptions && s.ads < AD_LIMIT && !s.sale && s.month >= s.saleAt;
   const saleReady = (s) => adOpen(s) && saleCan(s);
   function startSale(s) {
     if (!saleCan(s)) return false;
@@ -1273,7 +1349,7 @@ const Core = (() => {
 
   /* kind: job, gym, home, asset, reel, add:символ, cut:символ, up:улучшение */
   function act(s, kind) {
-    if (s.status !== 'playing' || s.fork || s.traitOptions) return false;
+    if (s.status !== 'playing' || s.fork || s.traitOptions || s.scOptions) return false;
     if (kind === 'job') {
       const j = nextJob(s);
       if (!j || s.skill < j.skill) return false;
@@ -1294,6 +1370,31 @@ const Core = (() => {
     else if (kind.slice(0, 3) === 'up:') { s.up[kind.slice(3)] += 1; s.charge = Math.min(s.charge, chargeMax(s)); }
     else if (kind.slice(0, 4) === 'cut:') { const sym = kind.slice(4); s.deck[sym] -= 1; if (sym === 'bill') s.billsCut += 1; else s.cut += 1; }
     return true;
+  }
+
+  /* Автопокупки: нажимают ту же act(), что и игрок, по тем же ценам (costOf).
+     Пока включена скидка за рекламу, платного не берут: скидку тратит сам игрок.
+     Сначала бесплатное повышение, потом самое дешёвое из включённого, пока денег не меньше цены × запас.
+     Запас не меньше 1, поэтому деньги автопокупка в минус не уводит.
+     Возвращает купленное по порядку: { kind, cost, lvl } — lvl это должность, жильё, номер инвестиции или уровень улучшения после покупки. */
+  const autoLvl = (s, k) => (k === 'job' ? s.job : k === 'home' ? s.home : k === 'asset' ? s.assets - 1 : k.slice(0, 3) === 'up:' ? s.up[k.slice(3)] : null);
+  function autoBuy(s, rules) {
+    const a = normAuto(rules), out = [];
+    if (!a.on || s.status !== 'playing' || s.fork || s.traitOptions || s.scOptions) return out;
+    if (a.job) while (act(s, 'job')) out.push({ kind: 'job', cost: 0, lvl: s.job });
+    /* скидка за рекламу ждёт покупки, которую выберет сам игрок: пока она не потрачена, платного не берём */
+    if (s.sale) return out;
+    for (let guard = 0; guard < 24; guard++) {
+      let best = null;
+      for (const k of AUTO_KINDS) {
+        if (!a.kinds[k]) continue;
+        const c = costOf(s, k);
+        if (c != null && s.money >= c * a.reserve && (!best || c < best[1])) best = [k, c];
+      }
+      if (!best || !act(s, best[0])) break;
+      out.push({ kind: best[0], cost: best[1], lvl: autoLvl(s, best[0]) });
+    }
+    return out;
   }
 
   function setFocus(s, f) {
@@ -1330,6 +1431,8 @@ const Core = (() => {
 
     const c = [];
     const add = (e, w, text, tone) => { if (e) c.push({ m: e.m, w, text, tone }); };
+    const sc = SCENARIOS[s.sc], st0 = first('start');
+    if (sc && st0) add(st0, 90, `Старт: ${sc.name}`, 'plain');
     add(first('million'), 100, 'Первый миллион', 'good');
     const j = last('job'); if (j) add(j, 50, `Повышение: ${JOBS[j.i].name}`, 'good');
     const h = last('home'); if (h) add(h, 40, `Переезд: ${HOMES[h.i].name}`, 'good');
@@ -1344,7 +1447,7 @@ const Core = (() => {
     add(first('reel'), 20, 'Купил четвёртый барабан', 'good');
     const lines = c.sort((x, y) => y.w - x.w).slice(0, 5).sort((x, y) => x.m - y.m || y.w - x.w)
       .map((x) => ({ age: ageAt(x.m), text: x.text, tone: x.tone }));
-    return { epitaph: `${head}, ${twist}.`, lines };
+    return { epitaph: (sc ? sc.epi + ' ' : '') + `${head}, ${twist}.`, lines };
   }
 
   /* ---------- Цели на жизнь: каждая один раз даёт +1 опыта ---------- */
@@ -1391,6 +1494,8 @@ const Core = (() => {
     gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS, chronicle,
     STORE, STORE_IDS, STORE_SHELVES, THEMES, THEME_BASE, normOwned, normTheme, ownsTheme, noAds,
     LOOK_BASE, LOOK_SLOTS, LOOK_SLOT_IDS, lookValues, ownsLook, normLook,
+    AUTO_KINDS, AUTO_RESERVES, normAuto, autoBuy,
+    SC_BASE, SCENARIOS, SC_IDS, ownedScenarios, pickScenario,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;
