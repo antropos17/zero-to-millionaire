@@ -7,7 +7,14 @@ const file = 'file://' + path.resolve(process.argv[2]);
   let grand = 0;
   for (const tab of (process.env.TAB ? [process.env.TAB] : ['shop', 'deck', 'goals'])) for (const [name, vp] of [['телефон 412×839', { width: 412, height: 839 }], ['телефон 360×640', { width: 360, height: 640 }], ['десктоп 1280×900', { width: 1280, height: 900 }]].filter((v) => !process.env.VP || v[0].includes(process.env.VP))) {
     const ctx = await browser.newContext({ viewport: vp });
-    if (process.env.THEME) await ctx.addInitScript((t) => { if (!sessionStorage.getItem('z2m-theme')) { sessionStorage.setItem('z2m-theme', '1'); localStorage.setItem('zero-to-millionaire-v2', JSON.stringify({ M: { owned: ['theme-' + t], theme: t } })); } }, process.env.THEME);
+    /* THEME=bill|dusk — купленная тема; LOOK=герой,дом,эпитафия (например street,nord,paper) — купленная косметика */
+    if (process.env.THEME || process.env.LOOK) await ctx.addInitScript(([t, lk]) => {
+      if (sessionStorage.getItem('z2m-theme')) return;
+      sessionStorage.setItem('z2m-theme', '1');
+      const [hero, home, epitaph] = (lk || 'base,base,base').split(',');
+      const owned = [t && 'theme-' + t, hero !== 'base' && 'hero-' + hero, home !== 'base' && 'home-' + home, epitaph !== 'base' && 'epitaph-' + epitaph].filter(Boolean);
+      localStorage.setItem('zero-to-millionaire-v2', JSON.stringify({ M: { owned, look: { theme: t || 'base', hero, home, epitaph } } }));
+    }, [process.env.THEME || '', process.env.LOOK || '']);
     const p = await ctx.newPage();
     const errors = [];
     p.on('pageerror', (e) => errors.push(e.message));
@@ -15,6 +22,7 @@ const file = 'file://' + path.resolve(process.argv[2]);
     await p.waitForSelector('#menuPlay', { state: 'visible' });
     /* THEME=bill|dusk: та же жизнь в купленной теме магазина (тема меняет только цвета) */
     if (process.env.THEME && (await p.evaluate(() => document.documentElement.dataset.theme)) !== process.env.THEME) console.log('   ТЕМА НЕ ПРИМЕНИЛАСЬ: ' + process.env.THEME);
+    if (process.env.LOOK && (await p.evaluate(() => { const L = window.z2m.meta().look; return [L.hero, L.home, L.epitaph].join(','); })) !== process.env.LOOK) console.log('   КОСМЕТИКА НЕ ПРИМЕНИЛАСЬ: ' + process.env.LOOK);
     await p.click('#menuPlay');
     await p.waitForTimeout(500);
     await p.click('#modalBtn');

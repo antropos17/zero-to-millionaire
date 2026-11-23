@@ -598,7 +598,15 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const theme = (q) => q.evaluate(() => document.documentElement.dataset.theme || 'base');
   ok('в меню есть «Магазин» и честная строка про покупки', await p.locator('#menuStore').isVisible() && /деньги не списываются/.test(await p.textContent('.menu-foot')) && !/Настоящих денег в игре нет/.test(await p.textContent('#menuLay')));
   await p.click('#menuStore');
-  ok('магазин открывается из меню: три полки, четыре товара, цены «тест»', await p.locator('#storeLay').isVisible() && (await p.locator('.store-shelf').count()) === 3 && (await p.locator('[data-buy]').count()) === 4 && (await p.locator('[data-buy] span').allTextContents()).every((t) => t === 'тест'));
+  ok('магазин открывается из меню: три полки, десять товаров, цены «тест»', await p.locator('#storeLay').isVisible() && (await p.locator('.store-shelf').count()) === 3 && (await p.locator('[data-buy]').count()) === 10 && (await p.locator('[data-buy] span').allTextContents()).every((t) => t === 'тест'));
+  ok('«Внешний вид»: четыре свёрнутые группы — тема, герой, дом, эпитафия, в каждой стандартный вариант выбран', JSON.stringify(await p.evaluate(() => Array.from(document.querySelectorAll('.store-group')).map((d) => d.dataset.group + (d.open ? '+' : '') + ':' + d.querySelectorAll('li').length))) === '["theme:3","hero:3","home:3","epitaph:3"]'
+    && (await p.locator('[data-pick$=":base"]:disabled').count()) === 4);
+  await p.evaluate(() => document.querySelectorAll('.store-group').forEach((d) => { d.open = true; }));
+  await p.waitForTimeout(100);
+  ok('у каждого варианта внешнего вида есть предпросмотр', (await p.locator('.store-group li .pv').count()) === 12);
+  const look = async (q) => (await meta(q)).look;
+  await p.click('[data-buy="hero-curls"]'); await p.click('#payCancel');
+  ok('отказ от косметики: ничего не куплено и ничего не выбрано', (await owned(p)).length === 0 && (await p.locator('[data-pick="hero:curls"]').count()) === 0 && (await p.textContent('[data-group="hero"] summary span')) === 'Выбрано: Обычный облик' && (await p.locator('[data-buy="hero-curls"]').isVisible()));
   ok('в магазине нет «выгодно», скидок, таймеров и сравнений', !/выгод|скидк|осталось|было|сегодня|%/i.test(await p.textContent('#storeBox')), await p.textContent('#storeBox'));
   await p.click('[data-buy="noads"]');
   ok('покупка открывает окно тестовой оплаты', await p.locator('#payLay').isVisible() && /Тестовая покупка\. Деньги не списываются/.test(await p.textContent('#payBox')) && (await p.textContent('#payPrice')) === 'тест');
@@ -608,11 +616,12 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.click('[data-buy="thanks"]');
   ok('ошибка оплаты: ничего не куплено, спокойная строка', /не прошла/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 0 && await p.locator('[data-buy="thanks"]').isVisible());
   await p.evaluate(() => { window.z2m.pay = null; });
-  for (const id of ['noads', 'theme-bill', 'theme-dusk', 'thanks']) { await p.click(`[data-buy="${id}"]`); await p.click('#payOk'); await p.waitForTimeout(50); }
-  ok('все четыре товара покупаются через заглушку', JSON.stringify(await owned(p)) === JSON.stringify(['noads', 'theme-bill', 'theme-dusk', 'thanks']) && (await p.locator('[data-buy]').count()) === 0);
+  const ALLIDS = await p.evaluate(() => Core.STORE_IDS);
+  for (const id of ALLIDS) { await p.click(`[data-buy="${id}"]`); await p.click('#payOk'); await p.waitForTimeout(50); }
+  ok('все десять товаров покупаются через заглушку', JSON.stringify(await owned(p)) === JSON.stringify(ALLIDS) && (await p.locator('[data-buy]').count()) === 0 && (await p.locator('[data-pick]').count()) === 12);
   await p.evaluate(() => { window.z2m.payRestore = ['thanks', 'nope']; });
   await p.click('#storeRestore');
-  ok('«Восстановить покупки» не дарит лишнего и не дублирует', /Новых покупок не найдено/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 4);
+  ok('«Восстановить покупки» не дарит лишнего и не дублирует', /Новых покупок не найдено/.test(await p.textContent('#storeNote')) && (await owned(p)).length === 10);
   await p.click('#storeClose');
   ok('магазин закрывается в один тап, в меню видна благодарность', !(await p.locator('#storeLay').isVisible()) && await p.locator('#menuThanks').isVisible() && /ничего не меняет в игре/i.test(await p.evaluate(() => Core.STORE.thanks.note)));
   /* темы меняют только цвета: ни одна рамка не сдвигается */
@@ -625,23 +634,54 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const bx0 = await boxes(), col0 = await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor);
   ok('вход в магазин из игры виден', await p.locator('#storeBtn').isVisible());
   for (const t of ['bill', 'dusk']) {
-    await p.click('#storeBtn'); await p.click(`[data-pick="${t}"]`); await p.click('#storeClose'); await p.waitForTimeout(400);
-    ok(`тема «${t}» выбрана и меняет только цвета`, (await theme(p)) === t && (await boxes()) === bx0 && (await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor)) !== col0 && (await meta(p)).theme === t);
+    await p.click('#storeBtn'); await p.click(`[data-pick="theme:${t}"]`); await p.click('#storeClose'); await p.waitForTimeout(400);
+    ok(`тема «${t}» выбрана и меняет только цвета`, (await theme(p)) === t && (await boxes()) === bx0 && (await p.evaluate(() => getComputedStyle(document.querySelector('.stage')).borderTopColor)) !== col0 && (await look(p)).theme === t);
   }
+  /* облик, стиль дома и эпитафия: применяются сразу, рамки на месте, предпросмотр — тот же рисунок, что на сцене */
+  const sceneSvg = () => p.evaluate(() => ({ hero: document.getElementById('charBody').innerHTML, home: document.querySelector('#home > g').innerHTML, box: document.getElementById('scene').getBoundingClientRect().height }));
+  const sc0 = await sceneSvg();
+  await p.click('#storeBtn');
+  for (const pick of ['hero:street', 'home:nord', 'epitaph:paper']) await p.click(`[data-pick="${pick}"]`);
+  const pv = await p.evaluate(() => ({ hero: document.querySelector('[data-item="hero-street"] svg').innerHTML, home: document.querySelector('[data-item="home-nord"] svg').innerHTML }));
+  await p.click('#storeClose'); await p.waitForTimeout(400);
+  const sc1 = await sceneSvg();
+  ok('облик и стиль дома видны на сцене сразу, без перезагрузки', sc1.hero !== sc0.hero && sc1.home !== sc0.home && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }));
+  ok('предпросмотр в магазине — тот же рисунок, что на сцене', pv.hero === sc1.hero && pv.home.includes(sc1.home));
+  ok('косметика не двигает ни одной рамки', (await boxes()) === bx0 && sc1.box === sc0.box);
   /* покупки переживают перезагрузку, новую жизнь и «Новую игру» */
   await p.reload(); await enter(p);
-  ok('после перезагрузки покупки и тема на месте', (await owned(p)).length === 4 && (await theme(p)) === 'dusk');
+  ok('после перезагрузки покупки и выбор на месте', (await owned(p)).length === 10 && (await theme(p)) === 'dusk' && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && /#FF5A7A/.test(await p.evaluate(() => document.getElementById('charBody').innerHTML)));
   await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.traitOptions = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
   await p.waitForTimeout(300);
+  ok('экран проигрыша: купленное оформление эпитафии показано', await p.locator('#modalBox .chron[data-ep="paper"] .epitaph').isVisible());
   ok('экран проигрыша: ни входа в магазин, ни упоминаний покупок', (await p.textContent('#modalTitle')) === '65 лет. Время вышло' && !/магазин|покуп|купить|реклам|тест/i.test(await p.textContent('#modalBox')) && (await p.evaluate(() => getComputedStyle(document.getElementById('storeBtn')).visibility)) === 'hidden' && await p.locator('#storeBtn').isDisabled(), await p.textContent('#modalBox'));
   await p.waitForTimeout(450); await p.click('#modalBtn');
-  ok('новая жизнь: покупки на месте', (await st(p)).life === 2 && (await owned(p)).length === 4);
+  ok('новая жизнь: покупки и выбор на месте', (await st(p)).life === 2 && (await owned(p)).length === 10 && (await look(p)).hero === 'street');
   await p.evaluate(() => { const s = window.z2m.state(); s.traitOptions = null; document.getElementById('traitLay').hidden = true; });
   await p.reload();
   await p.waitForSelector('#menuNew', { state: 'visible' });
   await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
-  ok('«Новая игра» стирает жизнь, но не покупки и тему', (await st(p)).life === 1 && (await owned(p)).length === 4 && (await meta(p)).theme === 'dusk' && (await theme(p)) === 'dusk');
+  ok('«Новая игра» стирает жизнь, но не покупки и выбор', (await st(p)).life === 1 && (await owned(p)).length === 10 && JSON.stringify(await look(p)) === JSON.stringify({ theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'paper' }) && (await theme(p)) === 'dusk');
   await p.close();
+
+  /* Косметика не меняет ни одного числа: одна и та же жизнь с одной очередью случайностей со стандартным набором
+     и со всем купленным и выбранным даёт одинаковое состояние до поля */
+  const lifeWith = async (M) => {
+    const q = await mk(null, 'menu', { content: `if (!sessionStorage.getItem('z2m-same')) { sessionStorage.setItem('z2m-same', '1'); localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify({ M }))}); }` });
+    await q.waitForSelector('#menuPlay', { state: 'visible' });
+    const r = await q.evaluate(() => {
+      let a = 20261123;
+      Math.random = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      window.z2m.skip(400);
+      return JSON.stringify(window.z2m.state());
+    });
+    const lk = (await meta(q)).look;
+    await q.context().close();
+    return { r, lk };
+  };
+  const plain = await lifeWith({ seenHelp: true, auto: false });
+  const dressed = await lifeWith({ seenHelp: true, auto: false, owned: ALLIDS, look: { theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'postcard' } });
+  ok('косметика не меняет ни одного числа: жизнь со всем выбранным совпадает со стандартной до поля', plain.r === dressed.r && dressed.lk.hero === 'curls' && dressed.lk.home === 'terra' && JSON.parse(plain.r).month >= 300, plain.r === dressed.r ? '' : 'расходятся');
 
   /* 11. Бонусы за рекламу: звезда, скидка, лимит на жизнь, четвёртая черта, честные подписи */
   p = await mk();

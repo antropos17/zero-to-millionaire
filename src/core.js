@@ -53,25 +53,54 @@ const Core = (() => {
   const normPerks = (perks) => { const P = {}; PERK_IDS.forEach((id) => { P[id] = Math.max(0, Math.min(PERKS[id].costs.length, (perks && perks[id]) | 0)); }); return P; };
   /* Магазин за настоящие деньги: только удобство, внешний вид и поддержка автора. Силу не продаём:
      ни денег в игре, ни наследия, ни шансов. Цены здесь нет, её отдаёт оплата площадки (ui.js, Pay).
-     shelf: полка; once: разовая покупка (восстанавливается); theme: какую тему открывает товар */
+     shelf: полка; once: разовая покупка (восстанавливается);
+     slot + value: какой вариант внешнего вида открывает товар (слоты — LOOK_SLOTS) */
   const STORE_SHELVES = [
     { id: 'noads', name: 'Без рекламы' },
     { id: 'look', name: 'Внешний вид' },
     { id: 'support', name: 'Поддержать автора' },
   ];
+  /* Слоты внешнего вида. В каждом стандартный вариант LOOK_BASE бесплатный и доступен всегда */
+  const LOOK_BASE = 'base';
+  const LOOK_SLOTS = [
+    { id: 'theme', name: 'Тема интерфейса', base: 'Стандартная тема', baseNote: 'Синяя, как с самого начала. Доступна всегда' },
+    { id: 'hero', name: 'Облик героя', base: 'Обычный облик', baseNote: 'Одежда по должности, как с самого начала. Доступен всегда' },
+    { id: 'home', name: 'Стиль дома', base: 'Обычный стиль', baseNote: 'Цвета жилья, как с самого начала. Доступен всегда' },
+    { id: 'epitaph', name: 'Оформление эпитафии', base: 'Обычное оформление', baseNote: 'Эпитафия и летопись на белой карточке. Доступно всегда' },
+  ];
+  const LOOK_SLOT_IDS = LOOK_SLOTS.map((sl) => sl.id);
   const STORE = {
     noads: { shelf: 'noads', name: 'Без рекламы', note: 'Бонусы за рекламу сразу, без ролика. Сами бонусы и их ограничения те же', once: true },
-    'theme-bill': { shelf: 'look', name: 'Тема «Зелёная купюра»', note: 'Цвета интерфейса: зелёный и тёмно-зелёный', once: true, theme: 'bill' },
-    'theme-dusk': { shelf: 'look', name: 'Тема «Вечер на вилле»', note: 'Цвета интерфейса: фиолетовый и сливовый', once: true, theme: 'dusk' },
+    'theme-bill': { shelf: 'look', name: 'Тема «Зелёная купюра»', note: 'Цвета интерфейса: зелёный и тёмно-зелёный', once: true, slot: 'theme', value: 'bill' },
+    'theme-dusk': { shelf: 'look', name: 'Тема «Вечер на вилле»', note: 'Цвета интерфейса: фиолетовый и сливовый', once: true, slot: 'theme', value: 'dusk' },
+    'hero-street': { shelf: 'look', name: 'Облик «Двор»', note: 'Вязаная шапка, яркие кеды и тёмные джинсы', once: true, slot: 'hero', value: 'street' },
+    'hero-curls': { shelf: 'look', name: 'Облик «Кудри»', note: 'Пышные кудри, кожаные ботинки и брюки хаки', once: true, slot: 'hero', value: 'curls' },
+    'home-terra': { shelf: 'look', name: 'Дом «Терракота»', note: 'Тёплые терракотовые стены, тёмная крыша и зелёные двери на всех уровнях жилья', once: true, slot: 'home', value: 'terra' },
+    'home-nord': { shelf: 'look', name: 'Дом «Север»', note: 'Белые стены, чёрная крыша и светлое дерево на всех уровнях жилья', once: true, slot: 'home', value: 'nord' },
+    'epitaph-paper': { shelf: 'look', name: 'Эпитафия «Газета»', note: 'Эпитафия и летопись в виде газетной вырезки', once: true, slot: 'epitaph', value: 'paper' },
+    'epitaph-postcard': { shelf: 'look', name: 'Эпитафия «Открытка»', note: 'Эпитафия и летопись на почтовой открытке с маркой', once: true, slot: 'epitaph', value: 'postcard' },
     thanks: { shelf: 'support', name: 'Спасибо автору', note: 'Ничего не меняет в игре. В меню появится отметка благодарности', once: true },
   };
   const STORE_IDS = Object.keys(STORE);
-  const THEME_BASE = 'base';
-  const THEMES = [THEME_BASE].concat(STORE_IDS.filter((id) => STORE[id].theme).map((id) => STORE[id].theme));
+  const THEME_BASE = LOOK_BASE;
+  /* все варианты слота: стандартный и те, что открывают товары */
+  const lookValues = (slot) => [LOOK_BASE].concat(STORE_IDS.filter((id) => STORE[id].slot === slot).map((id) => STORE[id].value));
+  const THEMES = lookValues('theme');
   /* Купленное из сохранения: только известные товары, без повторов; всё остальное считается «не куплено» */
   const normOwned = (list) => (Array.isArray(list) ? STORE_IDS.filter((id) => list.includes(id)) : []);
-  const ownsTheme = (owned, theme) => theme === THEME_BASE || STORE_IDS.some((id) => STORE[id].theme === theme && owned.includes(id));
-  const normTheme = (theme, owned) => (typeof theme === 'string' && THEMES.includes(theme) && ownsTheme(normOwned(owned), theme) ? theme : THEME_BASE);
+  const ownsLook = (owned, slot, value) => value === LOOK_BASE || STORE_IDS.some((id) => STORE[id].slot === slot && STORE[id].value === value && owned.includes(id));
+  /* Выбранный внешний вид из сохранения: по каждому слоту известный и купленный вариант, иначе стандартный.
+     legacyTheme: поле M.theme из сохранений до слотов, используется, если в look темы нет */
+  const normLook = (look, owned, legacyTheme) => {
+    const o = normOwned(owned), src = look && typeof look === 'object' && !Array.isArray(look) ? look : {}, L = {};
+    LOOK_SLOT_IDS.forEach((slot) => {
+      const v = slot === 'theme' && !Object.prototype.hasOwnProperty.call(src, 'theme') ? legacyTheme : src[slot];
+      L[slot] = typeof v === 'string' && lookValues(slot).includes(v) && ownsLook(o, slot, v) ? v : LOOK_BASE;
+    });
+    return L;
+  };
+  const ownsTheme = (owned, theme) => ownsLook(owned, 'theme', theme);
+  const normTheme = (theme, owned) => normLook({ theme }, owned).theme;
   const noAds = (owned) => normOwned(owned).includes('noads');
 
   /* Богатство к концу жизни даёт дополнительный опыт */
@@ -1361,6 +1390,7 @@ const Core = (() => {
     healthDecay, rollReels, resolve, spin, expected, fork, choose, act, setFocus, check,
     gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS, chronicle,
     STORE, STORE_IDS, STORE_SHELVES, THEMES, THEME_BASE, normOwned, normTheme, ownsTheme, noAds,
+    LOOK_BASE, LOOK_SLOTS, LOOK_SLOT_IDS, lookValues, ownsLook, normLook,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;

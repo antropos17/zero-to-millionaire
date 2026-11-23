@@ -190,27 +190,46 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
       thanks: !document.getElementById('menuThanks').hidden,
     }));
     await p.click('#storeClose');
+    r.look = await p.evaluate(() => { const L = window.z2m.meta().look; return [L.theme, L.hero, L.home, L.epitaph].join(','); });
+    r.hasTheme = await p.evaluate(() => 'theme' in window.z2m.meta());
     await p.click('#menuPlay'); await p.waitForTimeout(300);
+    r.scene = await p.evaluate(() => ({ hero: /#FF5A7A|#6B3F22/.test(document.getElementById('charBody').innerHTML), home: document.querySelector('#home > g').innerHTML.length }));
     await p.evaluate(() => { const s = window.z2m.state(); if (s.status === 'playing' && !s.fork && !s.traitOptions) window.z2m.skip(2); });
     r.junk = await junk(p);
     await p.close();
     return r;
   };
-  const ALL = 'noads,thanks,theme-bill,theme-dusk';
+  const IDS = ['noads', 'theme-bill', 'theme-dusk', 'hero-street', 'hero-curls', 'home-terra', 'home-nord', 'epitaph-paper', 'epitaph-postcard', 'thanks'];
+  const but = (...x) => IDS.filter((id) => !x.includes(id)).sort().join(',');
+  const ALL = but();
+  const B = 'base,base,base,base';
   const metaCases = [
-    ['старое сохранение без покупок', {}, ALL, 'base', false],
-    ['покупки строкой', { owned: 'noads', theme: 'dusk' }, ALL, 'base', false],
-    ['покупки объектом', { owned: { noads: true, thanks: 1 } }, ALL, 'base', false],
-    ['покупки мусором', { owned: [5, null, 'zzz', { id: 'noads' }], theme: 7 }, ALL, 'base', false],
-    ['тема без покупки темы', { owned: ['noads'], theme: 'dusk' }, 'thanks,theme-bill,theme-dusk', 'base', false],
-    ['неизвестная тема', { owned: ['theme-bill', 'theme-dusk'], theme: 'gold' }, 'noads,thanks', 'base', false],
-    ['повторы и чужие id', { owned: ['thanks', 'thanks', 'theme-dusk', 'vip'], theme: 'dusk' }, 'noads,theme-bill', 'dusk', true],
+    ['старое сохранение без покупок', {}, ALL, B, false],
+    ['покупки строкой', { owned: 'noads', theme: 'dusk' }, ALL, B, false],
+    ['покупки объектом', { owned: { noads: true, thanks: 1 } }, ALL, B, false],
+    ['покупки мусором', { owned: [5, null, 'zzz', { id: 'noads' }], theme: 7 }, ALL, B, false],
+    ['тема без покупки темы', { owned: ['noads'], theme: 'dusk' }, but('noads'), B, false],
+    ['неизвестная тема', { owned: ['theme-bill', 'theme-dusk'], theme: 'gold' }, but('theme-bill', 'theme-dusk'), B, false],
+    ['повторы и чужие id, старое поле темы', { owned: ['thanks', 'thanks', 'theme-dusk', 'vip'], theme: 'dusk' }, but('thanks', 'theme-dusk'), 'dusk,base,base,base', true],
+    ['старое сохранение с темой и без нового поля', { owned: ['theme-bill', 'hero-street'], theme: 'bill' }, but('theme-bill', 'hero-street'), 'bill,base,base,base', false],
+    ['выбор мусором', { owned: IDS, look: 'street' }, '', B, true],
+    ['выбор: мусор в полях', { owned: IDS, look: { theme: 5, hero: ['street'], home: { nord: 1 }, epitaph: 'gold', extra: 'x' } }, '', B, true],
+    ['выбран, но не куплен', { owned: ['hero-street', 'home-terra'], look: { theme: 'dusk', hero: 'curls', home: 'terra', epitaph: 'paper' } }, but('hero-street', 'home-terra'), 'base,base,terra,base', false],
+    ['новое поле важнее старого', { owned: ['theme-bill', 'theme-dusk'], theme: 'dusk', look: { theme: 'bill' } }, but('theme-bill', 'theme-dusk'), 'bill,base,base,base', false],
+    ['всё куплено и выбрано', { owned: IDS, look: { theme: 'dusk', hero: 'street', home: 'nord', epitaph: 'postcard' } }, '', 'dusk,street,nord,postcard', true],
   ];
-  for (const [name, M, buy, th, thanks] of metaCases) {
+  for (const [name, M, buy, lk, thanks] of metaCases) {
     const before = errors.length;
     const r = await shopSeen(M);
-    ok(`магазин, сохранение «${name}»: купленное прочитано честно`, errors.length === before && r.buy === buy && r.theme === th && r.thanks === thanks && !r.junk, JSON.stringify(r));
+    ok(`магазин, сохранение «${name}»: купленное и выбор прочитаны честно`, errors.length === before && r.buy === buy && r.theme === lk.split(',')[0] && r.look === lk && !r.hasTheme && r.scene.hero === (lk.split(',')[1] !== 'base') && r.thanks === thanks && !r.junk, JSON.stringify(r));
   }
+  /* «Новая игра» стирает жизнь, но не покупки и выбор */
+  p = await open(null, mut((c) => { c.M.owned = IDS; c.M.look = { theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'paper' }; c.M.seenHelp = true; }));
+  await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
+  const afterNew = await p.evaluate(() => window.z2m.meta());
+  ok('«Новая игра» не стирает покупки и выбор внешнего вида', (await st(p)).month === 0 && afterNew.owned.length === IDS.length && JSON.stringify(afterNew.look) === JSON.stringify({ theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'paper' })
+    && (await p.evaluate(() => document.querySelector('#home > g').innerHTML !== Art.home(window.z2m.state().home) && document.documentElement.dataset.theme === 'bill' && /#6B3F22/.test(document.getElementById('charBody').innerHTML))), JSON.stringify(afterNew.look));
+  await p.close();
 
   /* 9. Магазин открыт во время спина, который открывает развилку: развилка ждёт, окна под магазином нет */
   p = await open();

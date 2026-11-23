@@ -25,7 +25,7 @@
     },
   };
 
-  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], theme: 'base' });
+  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], look: C.normLook(null, []) });
   let S = C.newState(null, 1);
   let M = freshMeta();
 
@@ -175,7 +175,7 @@
   /* транспорт на сцене растёт вместе с рубежами по деньгам: это только вид */
   const vehicleTier = (s) => Math.min(6, s.ms);
 
-  let lastDrawnMonth = 0;
+  let lastDrawnMonth = 0, homeLevel = -1;
   const keys = {};
   function part(id, key, build) {
     if (keys[id] === key) return false;
@@ -212,13 +212,15 @@
     bd.style.setProperty('--lit', Math.max(0, Math.min(1, (f - 0.6) / 0.2)).toFixed(2));
 
     const pop = (id) => { const n = el(id); n.classList.remove('pop'); void n.getBoundingClientRect(); n.classList.add('pop'); };
-    if (part('home', 'h' + s.home, () => `<g>${Art.home(s.home)}</g>`) && !firstTime) pop('home');
+    const L = M.look;
+    if (part('home', 'h' + s.home + L.home, () => `<g>${Art.home(s.home, L.home)}</g>`) && !firstTime && homeLevel !== s.home) pop('home');
+    homeLevel = s.home;
     const vt = vehicleTier(s);
     if (part('vehicle', 'v' + vt, () => (vt ? Art.vehicle(vt) : '')) && !firstTime && vt) pop('vehicle');
     part('tree', villa ? 'palm' : 't' + season, () => (villa ? Art.palm(366, 142, 58, 'fade') : Art.tree(season)));
     part('coins', 'c' + coinCount(s), () => Art.coins(coinCount(s)));
     const a = C.age(s);
-    part('charBody', [s.job, a < 45 ? 0 : a < 57 ? 1 : 2, s.health < 25 ? 0 : s.health < 50 ? 1 : 2].join(), () => Art.person({ job: s.job, age: a, health: s.health }));
+    part('charBody', [s.job, a < 45 ? 0 : a < 57 ? 1 : 2, s.health < 25 ? 0 : s.health < 50 ? 1 : 2, L.hero].join(), () => Art.person({ job: s.job, age: a, health: s.health, look: L.hero }));
     part('charTag', s.money < 0 ? 'debt' : 'ok', () => (s.money < 0 ? '<rect x="-16" y="-104" width="32" height="15" rx="7.500" fill="#F0503C"/><text x="0" y="-93" text-anchor="middle" font-family="Nunito, sans-serif" font-weight="900" font-size="9.500" fill="#fff">долг</text>' : ''));
     part('weather', villa ? 'none' : season === 3 ? 'snow' : season === 2 ? 'leaves' : 'none', () => Art.weather(villa ? '' : season === 3 ? 'snow' : season === 2 ? 'leaves' : ''));
   }
@@ -1276,8 +1278,8 @@
     const common = [['Должность', C.JOBS[S.job].name], ['Жильё', C.HOMES[S.home].name]].concat(S.trait ? [['Черта', C.TRAITS[S.trait].name]] : [], [['На счету', money(S.money)]]);
     const toPerks = { alt: 'Потратить опыт', altAction: () => { showTab('goals'); save(); } };
     const ch = C.chronicle(S);
-    const story = `<blockquote class="epitaph">${esc(ch.epitaph)}</blockquote>`
-      + (ch.lines.length ? `<ol class="story">${ch.lines.map((l) => `<li class="${l.tone}"><b>${years(l.age)}</b><span>${esc(l.text)}</span></li>`).join('')}</ol>` : '');
+    const story = `<div class="chron" data-ep="${M.look.epitaph}"><blockquote class="epitaph">${esc(ch.epitaph)}</blockquote>`
+      + (ch.lines.length ? `<ol class="story">${ch.lines.map((l) => `<li class="${l.tone}"><b>${years(l.age)}</b><span>${esc(l.text)}</span></li>`).join('')}</ol>` : '') + '</div>';
     if (won) {
       sfx.big();
       confetti(70, true);
@@ -1457,7 +1459,7 @@
     anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false;
     $('chargeLay').hidden = true; $('traitLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
     store.clear();
-    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, theme: M.theme };
+    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look };
     S = C.newState(null, 1);
     M = Object.assign(freshMeta(), keep);
     hideModal();
@@ -1584,32 +1586,50 @@
 
   /* ---------- Магазин: окно поверх игры и меню ---------- */
   function applyTheme() {
-    M.theme = C.normTheme(M.theme, M.owned);
+    M.look = C.normLook(M.look, M.owned);
     const root = document.documentElement;
-    if (M.theme === C.THEME_BASE) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', M.theme);
+    if (M.look.theme === C.LOOK_BASE) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', M.look.theme);
     const tc = document.querySelector('meta[name="theme-color"]');
     if (tc) tc.setAttribute('content', getComputedStyle(root).getPropertyValue('--blue').trim() || '#2B45D4');
   }
   let storeFrom = 'menu';
   const storeNote = (t) => { $('storeNote').textContent = t || ''; };
-  function themeBtn(theme) {
-    const on = M.theme === theme;
-    return `<button class="btn btn-buy" type="button" data-pick="${theme}"${on ? ' disabled' : ''}><b>${on ? 'Выбрано' : 'Выбрать'}</b></button>`;
+  /* группы полки «Внешний вид», которые игрок раскрыл: держим раскрытыми между перерисовками */
+  const storeOpenGroups = new Set();
+  function pickBtn(slot, value) {
+    const on = M.look[slot] === value;
+    return `<button class="btn btn-buy" type="button" data-pick="${slot}:${value}"${on ? ' disabled' : ''}><b>${on ? 'Выбрано' : 'Выбрать'}</b></button>`;
   }
-  function storeRow(id, name, note, btn) {
-    return `<li data-item="${id}"><div><b class="st-name">${esc(name)}</b><span class="st-note">${esc(note)}</span></div>${btn}</li>`;
+  /* Предпросмотр варианта тем же рисунком и тем же CSS, что в игре: тема — её цвета, герой и дом — нынешние
+     должность, возраст, здоровье и жильё, эпитафия — те же классы, что в окне конца жизни */
+  function lookPreview(slot, value) {
+    if (slot === 'theme') return `<span class="pv pv-theme" data-theme="${value}" aria-hidden="true"><i></i><i></i><i></i></span>`;
+    if (slot === 'hero') return `<svg class="pv pv-hero" viewBox="-30 -92 60 96" aria-hidden="true">${Art.person({ job: S.job, age: C.age(S), health: S.health, look: value })}</svg>`;
+    if (slot === 'home') return `<svg class="pv pv-home" viewBox="0 0 250 172" aria-hidden="true"><rect width="250" height="172" fill="#BFE6FF"/><rect y="146" width="250" height="26" fill="#8FD66B"/>${Art.home(S.home, value)}</svg>`;
+    return `<span class="pv pv-ep" aria-hidden="true"><span class="chron" data-ep="${value}"><span class="epitaph">Жил смело</span><span class="story"><i></i><i></i></span></span></span>`;
+  }
+  function storeRow(id, name, note, btn, pv) {
+    return `<li data-item="${id}"${pv ? ' class="has-pv"' : ''}>${pv || ''}<div><b class="st-name">${esc(name)}</b><span class="st-note">${esc(note)}</span></div>${btn}</li>`;
+  }
+  function itemBtn(id) {
+    const it = C.STORE[id], has = M.owned.includes(id);
+    return has && it.slot ? pickBtn(it.slot, it.value)
+      : has ? '<button class="btn btn-buy" type="button" disabled><b>Куплено</b></button>'
+        : `<button class="btn btn-buy" type="button" data-buy="${id}"><b>Купить</b><span>${esc(Pay.price(id))}</span></button>`;
   }
   function renderStore() {
     $('storeShelves').innerHTML = C.STORE_SHELVES.map((sh) => {
-      const rows = C.STORE_IDS.filter((id) => C.STORE[id].shelf === sh.id).map((id) => {
-        const it = C.STORE[id], has = M.owned.includes(id);
-        const btn = has && it.theme ? themeBtn(it.theme)
-          : has ? '<button class="btn btn-buy" type="button" disabled><b>Куплено</b></button>'
-            : `<button class="btn btn-buy" type="button" data-buy="${id}"><b>Купить</b><span>${esc(Pay.price(id))}</span></button>`;
-        return storeRow(id, it.name, it.note, btn);
+      const ids = C.STORE_IDS.filter((id) => C.STORE[id].shelf === sh.id);
+      if (sh.id !== 'look') return `<section class="store-shelf"><h3>${esc(sh.name)}</h3><ul>${ids.map((id) => storeRow(id, C.STORE[id].name, C.STORE[id].note, itemBtn(id))).join('')}</ul></section>`;
+      /* внешний вид: группа на каждый слот, в ней стандартный вариант и товары; группа сворачивается */
+      const groups = C.LOOK_SLOTS.map((sl) => {
+        const items = ids.filter((id) => C.STORE[id].slot === sl.id);
+        const rows = [storeRow(sl.id + '-base', sl.base, sl.baseNote, pickBtn(sl.id, C.LOOK_BASE), lookPreview(sl.id, C.LOOK_BASE))]
+          .concat(items.map((id) => storeRow(id, C.STORE[id].name, C.STORE[id].note, itemBtn(id), lookPreview(sl.id, C.STORE[id].value))));
+        const cur = M.look[sl.id] === C.LOOK_BASE ? sl.base : C.STORE[items.find((id) => C.STORE[id].value === M.look[sl.id])].name;
+        return `<details class="store-group" data-group="${sl.id}"${storeOpenGroups.has(sl.id) ? ' open' : ''}><summary><b>${esc(sl.name)}</b><span>Выбрано: ${esc(cur)}</span></summary><ul>${rows.join('')}</ul></details>`;
       });
-      if (sh.id === 'look') rows.unshift(storeRow('theme-base', 'Стандартная тема', 'Синяя, как с самого начала. Доступна всегда', themeBtn(C.THEME_BASE)));
-      return `<section class="store-shelf"><h3>${esc(sh.name)}</h3><ul>${rows.join('')}</ul></section>`;
+      return `<section class="store-shelf"><h3>${esc(sh.name)}</h3><div class="store-groups">${groups.join('')}</div></section>`;
     }).join('');
   }
   function openStore() {
@@ -1648,10 +1668,12 @@
       if (storeOpen) renderStore();
     }, () => { storeNote('Покупка не прошла. Деньги не списаны'); });
   }
-  function storePick(theme) {
-    if (!C.ownsTheme(M.owned, theme)) return;
-    M.theme = theme;
+  /* выбор варианта: применяется сразу, сцена перерисовывается без перезагрузки */
+  function storePick(slot, value) {
+    if (!C.LOOK_SLOT_IDS.includes(slot) || !C.ownsLook(M.owned, slot, value)) return;
+    M.look = Object.assign({}, M.look, { [slot]: value });
     applyTheme();
+    render();
     save();
     renderStore();
   }
@@ -1670,10 +1692,14 @@
   $('storeClose').addEventListener('click', closeStore);
   $('storeLay').addEventListener('click', (e) => { if (e.target === $('storeLay')) closeStore(); });
   $('storeRestore').addEventListener('click', storeRestore);
+  $('storeShelves').addEventListener('toggle', (e) => {
+    const g = e.target.dataset && e.target.dataset.group;
+    if (g) { if (e.target.open) storeOpenGroups.add(g); else storeOpenGroups.delete(g); }
+  }, true);
   $('storeShelves').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
-    if (b.dataset.buy) storeBuy(b.dataset.buy); else if (b.dataset.pick) storePick(b.dataset.pick);
+    if (b.dataset.buy) storeBuy(b.dataset.buy); else if (b.dataset.pick) storePick(...b.dataset.pick.split(':'));
   });
 
   /* ---------- Загрузка: ждём шрифты и картинки, полоска показывает настоящую долю готового ---------- */
@@ -1742,7 +1768,8 @@
     M.sound = M.sound === true; M.auto = M.auto !== false; M.seenHelp = M.seenHelp === true;
     M.perks = C.normPerks(M.perks);
     M.owned = C.normOwned(M.owned);
-    M.theme = C.normTheme(M.theme, M.owned);
+    M.look = C.normLook(saved.M.look, M.owned, M.theme); /* до слотов тема лежала в M.theme */
+    delete M.theme;
   }
   applyTheme();
   /* опыт из прошлых версий был процентом к доходу: теперь это очки, которые можно потратить */
@@ -1769,6 +1796,7 @@
     pay: null,
     payRestore: null,
     state: () => S,
+    meta: () => JSON.parse(JSON.stringify(M)),
     refresh: () => { render(); save(); },
     skip(n) {
       for (let i = 0; i < n && S.status === 'playing'; i++) C.spin(S, Math.random, { auto: true });
