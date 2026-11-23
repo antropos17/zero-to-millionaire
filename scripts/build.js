@@ -14,7 +14,9 @@ const fonts = JSON.parse(fs.readFileSync(path.join(fontsDir, 'faces.json'), 'utf
 }).join('');
 
 const core = noExport(read('core.js'));
-const ui = noExport(read('art.js')) + '\n' + read('ui.js');
+/* звуки: выбранные дубли earshot (tools/sfx.json, assets/sounds) как SOUND_DATA для блока «Звук» в ui.js */
+const sounds = require('./sound-data.js');
+const ui = `const SOUND_DATA = ${JSON.stringify(sounds.game)};\n` + noExport(read('art.js')) + '\n' + read('ui.js');
 
 /* сборка не выпускает файл с синтаксической ошибкой: оба скрипта сначала компилируются */
 for (const [name, code] of [['core.js', core], ['art.js + ui.js', ui]]) {
@@ -30,6 +32,7 @@ const html = read('template.html')
 const out = process.argv[2] || path.join(root, 'dist', 'zero-to-millionaire.html');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
-console.log('собрано:', path.relative(process.cwd(), out), (html.length / 1024).toFixed(0) + ' КБ, начертаний шрифтов:', (fonts.match(/@font-face/g) || []).length);
+const soundKb = Object.values(sounds.game).reduce((a, t) => a + t.d.length, 0) / 1024;
+console.log('собрано:', path.relative(process.cwd(), out), (html.length / 1024).toFixed(0) + ' КБ, начертаний шрифтов:', (fonts.match(/@font-face/g) || []).length, '| звуков-дублей:', Object.keys(sounds.game).length, soundKb.toFixed(1) + ' КБ');
 /* страница прослушивания звуков: dist/sound-check.html, звуки берутся из того же src/ui.js */
 if (!process.argv[2]) require('./sounds.js');
