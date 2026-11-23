@@ -315,10 +315,20 @@
       o.start(t0); o.stop(t0 + dur + 0.02);
     } catch (e) { /* без звука */ }
   }
+  /* одна фанфара на спин: результат, рост уровня (+650 мс) и рубеж (+750 мс) одного спина звучат одним big */
+  let lastBig = -1e9;
+  function onceASpin() {
+    const now = performance.now();
+    if (now - lastBig < 1000) return false;
+    lastBig = now;
+    return true;
+  }
+  /* Safari держит контекст, созданный не в нажатии, приостановленным: будим его первым касанием */
+  if (window.addEventListener) window.addEventListener('pointerdown', () => { if (audio && audio.state !== 'running' && audio.resume) audio.resume().catch(() => {}); }, true);
   const sfx = {
     stop: () => tone(220, 0.05, 'sine', 0.06),
     good: () => { tone(659, 0.1); tone(988, 0.16, 'triangle', 0.07, 0.08); },
-    big: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, i * 0.08)),
+    big: () => onceASpin() && [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, i * 0.08)),
     bad: () => { tone(220, 0.16, 'sawtooth', 0.04); tone(165, 0.24, 'sawtooth', 0.04, 0.11); },
     buy: () => { tone(784, 0.07, 'sine', 0.08); tone(1175, 0.1, 'sine', 0.07, 0.06); },
     fork: () => { tone(440, 0.12, 'sine', 0.08); tone(554, 0.12, 'sine', 0.08, 0.1); tone(659, 0.2, 'sine', 0.08, 0.2); },
@@ -348,6 +358,9 @@
     }
     const n = target.length;
     let left = n;
+    /* досрочно завершённые барабаны (второе «Крутить», уход со вкладки) встают разом: на всех один stop */
+    const started = performance.now();
+    let rushed = false;
     anims = strips.slice(0, n).map((strip, i) => {
       /* пролетающие символы берутся с теми же весами, что и настоящие */
       const filler = [];
@@ -364,7 +377,9 @@
       a.onfinish = () => {
         strip.style.transform = '';
         setReel(i, target[i]);
-        sfx.stop();
+        const early = performance.now() - started < a.effect.getTiming().duration - 30;
+        if (!early || !rushed) sfx.stop();
+        if (early) rushed = true;
         if (--left === 0) { anims = []; done(); }
       };
       return a;

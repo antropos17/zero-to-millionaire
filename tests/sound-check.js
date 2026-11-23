@@ -3,6 +3,53 @@
 const path = require('path');
 const { chromium } = require('playwright');
 
+/* Звуки настоящей игры: какие sfx сыграли (по осцилляторам синтеза: stop — 220 Гц, big — первая нота 523 Гц) */
+async function gameSounds(browser, file, reduced, errors) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: reduced ? 'reduce' : 'no-preference' });
+  await ctx.addInitScript(() => {
+    window.__osc = [];
+    const st = OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start = function (when) { window.__osc.push({ f: this.frequency.value, type: this.type, at: when }); return st.apply(this, arguments); };
+  });
+  const p = await ctx.newPage();
+  p.on('pageerror', (e) => errors.push('игра: ' + e.message));
+  await p.goto('file:///' + file.replace(/\\/g, '/'));
+  await p.waitForSelector('#menuPlay', { state: 'visible' }); await p.click('#menuPlay'); await p.waitForTimeout(500);
+  await p.click('#modalBtn').catch(() => {});
+  if (await p.evaluate(() => JSON.parse(localStorage.getItem('zero-to-millionaire-v2')).M.auto)) await p.click('#autoBtn');
+  await p.click('#soundBtn');
+  await p.waitForTimeout(800);
+  const D0 = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+  const fix = (patch) => p.evaluate((x) => { const s = window.z2m.state(); Object.assign(s, { deck: Object.assign({}, x.d), ms: 6, fork: null, focus: 'work' }, x.patch); window.z2m.refresh(); }, { d: D0, patch });
+  const force = (q) => p.evaluate((arr) => { const q = arr.slice(); const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); }, q);
+  const res = {};
+  if (!reduced) {
+    await fix({ money: 500 });
+    await force([0.1, 0.5, 0.75]);
+    await p.evaluate(() => { window.__osc = []; });
+    await p.click('#spinBtn'); await p.waitForTimeout(120); await p.click('#spinBtn');
+    await p.waitForTimeout(900);
+    const stops = (await p.evaluate(() => window.__osc)).filter((x) => x.f === 220 && x.type === 'sine');
+    res.rushStops = stops.length;
+    res.rushPeak = await p.evaluate(async (offs) => {
+      const sr = 48000, c = new OfflineAudioContext(1, sr, sr);
+      for (const t of offs) { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 220; g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05); o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.07); }
+      const d = (await c.startRendering()).getChannelData(0); let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v)); return +pk.toFixed(4);
+    }, stops.map((x) => x.at - stops[0].at));
+    await p.waitForTimeout(1500);
+  }
+  await fix({ money: 990, ms: 0, xp: Object.assign({}, await p.evaluate(() => window.z2m.state().xp), { work: 24 }) });
+  await force([0.1, 0.1, 0.1]);
+  await p.evaluate(() => { window.__osc = []; });
+  await p.click('#spinBtn');
+  await p.waitForTimeout(3000);
+  res.bigs = (await p.evaluate(() => window.__osc)).filter((x) => x.f === 523).length;
+  const s = await p.evaluate(() => { const s = window.z2m.state(); return { ms: s.ms, lvl: Core.level(s, 'work') }; });
+  if (s.ms !== 1 || s.lvl !== 2) errors.push('игра: спин не дал рубеж и рост уровня ' + JSON.stringify(s));
+  await ctx.close();
+  return res;
+}
+
 (async () => {
   const file = path.resolve(process.argv[2] || 'dist/sound-check.html');
   const browser = await chromium.launch();
@@ -65,6 +112,22 @@ const { chromium } = require('playwright');
   })));
   console.log('\nтипичная минута (одна случайная жизнь):', JSON.stringify(plans));
   console.log('AudioContext после нажатий:', state);
+
+  /* Игра: досрочная остановка даёт один stop, спин с тройкой, ростом уровня и рубежом — один big */
+  const game = path.resolve(process.argv[3] || path.join(path.dirname(file), 'zero-to-millionaire.html'));
+  const single = rows.stop.peak;
+  for (const reduced of [false, true]) {
+    const g = await gameSounds(browser, game, reduced, errors);
+    const tag = reduced ? 'без анимаций' : 'обычно';
+    if (!reduced) {
+      const okR = g.rushStops === 1 && g.rushPeak <= single * 1.05;
+      if (!okR) bad++;
+      console.log(`${okR ? 'ok  ' : 'НЕТ '} досрочная остановка (${tag}): stop ${g.rushStops}, пик ${g.rushPeak} при одиночном ${single}`);
+    }
+    const okB = g.bigs === 1;
+    if (!okB) bad++;
+    console.log(`${okB ? 'ok  ' : 'НЕТ '} тройка + рост уровня + рубеж (${tag}): big ${g.bigs}`);
+  }
   console.log(errors.length ? 'ОШИБКИ:\n' + errors.join('\n') : 'ошибок в консоли нет, сетевых запросов нет');
   await browser.close();
   process.exit(bad || errors.length ? 1 : 0);
