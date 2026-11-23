@@ -50,6 +50,9 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     'битая запись об опыте': mut((c) => { c.S.status = 'lost'; c.S.month = 564; c.S.paid = true; }),
     'миллион без снимка': mut((c) => { c.S.wonAt = 100; c.S.won = null; }),
     'версия из будущего': mut((c) => { c.S.v = 99; }),
+    'чужой сценарий': mut((c) => { c.S.sc = 'zzz'; }),
+    'выбор старта без стандартного': mut((c) => { c.S.scOptions = ['loan']; }),
+    'выбор старта с мусором': mut((c) => { c.S.scOptions = ['base', 'zzz']; }),
     'улучшение выше максимума': mut((c) => { c.S.up.mult = 9; }),
     'покупки и тема мусором': mut((c) => { c.M.owned = { noads: true }; c.M.theme = { x: 1 }; }),
     'наследие мусором': mut((c) => { c.S.perks = { cash: 'x' }; c.M.perks = { cash: 99, nope: 3, genes: -4 }; }),
@@ -82,6 +85,8 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   const v6 = { v: 6, money: 30000, month: 150, job: 4, skill: 60, health: 70, network: 8, home: 2, assets: 3, deck: { work: 10, study: 5, health: 3, network: 2, chance: 5, coin: 3, bill: 3, wild: 0 }, bought: { study: 2, health: 0, network: 0, chance: 0, wild: 0 }, billsCut: 1, cut: 0, charge: 3, xp: { work: 40, study: 20, health: 0, network: 0 }, reels4: false, up: { mult: 1, star: 0, insure: 1, coach: 0 }, boost: 0, boostAt: 40, focus: 'work', fork: null, lastForks: ['blog'], ms: 3, trait: 'frugal', traitOptions: null, flags: { debt: false, low: false, yes: 3, gold: 1, sets: ['intern'], quad: false }, perks: { cash: 1, genes: 0, tough: 0, ties: 0, school: 0, sale: 1, star: 0, traits: 0, joker: 0 }, life: 2, status: 'playing', peak: 30000, wonAt: null, won: null, earned: 60000 };
   olds.v6 = v6;
   olds.v7 = Object.assign(JSON.parse(JSON.stringify(v6)), { v: 7, boost: 5, boostAt: 180, flags: Object.assign({}, v6.flags, { gold: 2 }), story: [{ m: 20, k: 'job', i: 1 }, { m: 90, k: 'fork', t: 'Свадьба', pick: 'gold', d: 0 }] });
+  /* v8: последняя версия до сценариев старта */
+  olds.v8 = Object.assign(JSON.parse(JSON.stringify(olds.v7)), { v: 8, ads: 2, starAt: 0, saleAt: 0, sale: false, trait4: false });
   for (const [name, S] of Object.entries(olds)) {
     const before = errors.length;
     const p = await open(null, JSON.stringify({ S, M: { seenHelp: true, auto: false, goals: ['m50'], best: 400 }, t: Date.now() }));
@@ -89,11 +94,11 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.click('#menuPlay'); await p.waitForTimeout(500);
     const s = await st(p);
     const pts = await p.textContent('#ptsLine');
-    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 8 && s.ads === Math.min(16, (S.flags && S.flags.gold) || 0) && s.sale === false && s.trait4 === false && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
-    if (name === 'v6' || name === 'v7') {
+    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === Math.min(16, (S.flags && S.flags.gold) || 0) && s.sale === false && s.trait4 === false && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    if (name === 'v6' || name === 'v7' || name === 'v8') {
       const head = await p.textContent('#adsHead');
       const rows = await p.evaluate(() => ['boost', 'ad-star', 'ad-sale'].map((k) => document.querySelector(`li[data-kind="${k}"] .btn-buy`).textContent).join(' | '));
-      ok(`сохранение ${name}: черта, наследие и летопись на месте, бонусы считаются с уже взятого золота`, s.trait === 'frugal' && s.perks.sale === 1 && s.deck.work === 10 && (name === 'v6' ? s.story.length === 0 && s.boost === 0 : s.story.length === 2 && s.boost === 5 && s.boostAt === 180) && head === `Бонусы · ${S.flags.gold} из 16` && (name === 'v7' ? /Идёт/.test(rows) : true), JSON.stringify({ head, rows, story: s.story.length }));
+      ok(`сохранение ${name}: черта, наследие и летопись на месте, бонусы считаются с уже взятого золота`, s.trait === 'frugal' && s.perks.sale === 1 && s.deck.work === 10 && (name === 'v6' ? s.story.length === 0 && s.boost === 0 : s.story.length === 2 && s.boost === 5 && s.boostAt === 180) && head === `Бонусы · ${S.flags.gold} из 16` && (name !== 'v6' ? /Идёт/.test(rows) : true), JSON.stringify({ head, rows, story: s.story.length }));
       /* скидка за рекламу перемножается с «Аскетом» и «Умением торговаться» */
       const c = await p.evaluate(() => { const t = JSON.parse(JSON.stringify(window.z2m.state())); const a = Core.costOf(t, 'home'); t.sale = true; return { a, b: Core.costOf(t, 'home'), list: Core.homeCost(t) }; });
       ok(`сохранение ${name}: скидка 20% поверх «Аскета» и перка`, c.a === Math.round(14000 * 0.85 * 0.95) && c.b === Math.round(c.a * 0.8) && c.list === c.a, JSON.stringify(c));
@@ -199,7 +204,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.close();
     return r;
   };
-  const IDS = ['noads', 'speed8', 'autobuy', 'theme-bill', 'theme-dusk', 'hero-street', 'hero-curls', 'home-terra', 'home-nord', 'epitaph-paper', 'epitaph-postcard', 'thanks'];
+  const IDS = ['noads', 'speed8', 'autobuy', 'sc-loan', 'sc-late', 'sc-flat', 'theme-bill', 'theme-dusk', 'hero-street', 'hero-curls', 'home-terra', 'home-nord', 'epitaph-paper', 'epitaph-postcard', 'thanks'];
   const but = (...x) => IDS.filter((id) => !x.includes(id)).sort().join(',');
   const ALL = but();
   const B = 'base,base,base,base';
@@ -262,6 +267,25 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   ok('«Новая игра» не стирает покупки и выбор внешнего вида', (await st(p)).month === 0 && afterNew.owned.length === IDS.length && JSON.stringify(afterNew.look) === JSON.stringify({ theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'paper' })
     && (await p.evaluate(() => document.querySelector('#home > g').innerHTML !== Art.home(window.z2m.state().home) && document.documentElement.dataset.theme === 'bill' && /#6B3F22/.test(document.getElementById('charBody').innerHTML))), JSON.stringify(afterNew.look));
   await p.close();
+
+  /* Новые жизни: в окне старта только купленные сценарии, даже если в сохранении лежит другой */
+  const scSeen = async (owned, opts) => {
+    const p = await open(null, mut((c) => { c.M = { seenHelp: true, auto: false, owned }; c.S.month = 0; c.S.fork = null; c.S.traitOptions = null; c.S.scOptions = opts; }));
+    await p.click('#menuPlay'); await p.waitForTimeout(400);
+    const r = { lay: await p.locator('#scLay').isVisible(), ids: await p.evaluate(() => [...document.querySelectorAll('#scOpts [data-sc]')].map((b) => b.dataset.sc).join(',')), opts: (await st(p)).scOptions, junk: await junk(p) };
+    await p.close();
+    return r;
+  };
+  for (const [name, owned, opts, want] of [
+    ['чужой сценарий в сохранении', ['sc-loan'], ['base', 'late'], (r) => !r.lay && r.opts === null],
+    ['купленный и чужой', ['sc-loan'], ['base', 'loan', 'flat'], (r) => r.lay && r.ids === 'base,loan'],
+    ['покупка не в том поле', 'sc-late', ['base', 'late'], (r) => !r.lay && r.opts === null],
+    ['всё купленное', ['sc-loan', 'sc-late', 'sc-flat'], ['base', 'loan', 'late', 'flat'], (r) => r.lay && r.ids === 'base,loan,late,flat'],
+  ]) {
+    const before = errors.length;
+    const r = await scSeen(owned, opts);
+    ok(`«Новые жизни», сохранение «${name}»: предложено только купленное`, errors.length === before && want(r) && !r.junk, JSON.stringify(r));
+  }
 
   /* Возврат во вкладку при открытом окне автопокупок: «Пока тебя не было» не открывается поверх, догоняет после «Готово» */
   p = await open(null, mut((c) => { c.M = Object.assign({ seenHelp: true, auto: true }, { owned: ['autobuy'] }); c.t = Date.now(); c.S.fork = null; c.S.traitOptions = null; }));

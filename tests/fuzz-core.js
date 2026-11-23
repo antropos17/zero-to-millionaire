@@ -14,6 +14,8 @@ function check(s, where) {
   if (!Number.isInteger(s.ads) || s.ads < 0 || s.ads > Core.AD_LIMIT) note('счётчик рекламы вне 0..лимита', where + ' ' + s.ads);
   if (typeof s.sale !== 'boolean' || typeof s.trait4 !== 'boolean') note('флаги бонусов не логические', where);
   if (s.traitOptions && new Set(s.traitOptions).size !== s.traitOptions.length) note('черты повторяются', where);
+  if (s.sc !== Core.SC_BASE && !Core.SC_IDS.includes(s.sc)) note('неизвестный сценарий', where + ' ' + s.sc);
+  if (s.scOptions && s.status === 'playing' && s.month > 0 && !Core.SCENARIOS[s.sc]) note('выбор старта посреди жизни', where);
   if (s.month > Core.TOTAL) note('месяц больше конца жизни', where);
   if (s.status === 'playing' && s.month >= Core.TOTAL) note('жизнь не закончилась в 65', where);
   if (s.status !== 'playing' && s.fork) note('развилка после конца жизни', where);
@@ -64,13 +66,27 @@ function autoCheck(s, rules, where) {
   }
   if (JSON.stringify(t) !== JSON.stringify(s)) note('автопокупки не равны тем же ручным покупкам', where);
 }
+let scLives = 0;
 let lives = 0, steps = 0, forks = 0, golds = 0, won = 0, lost = 0, retired = 0, maxMoney = 0;
 const N = +process.argv[2] || 1500;
 for (let i = 0; i < N; i++) {
   const rng = mulberry(77 + i);
   const perks = {}; for (const id of Core.PERK_IDS) if (rng() < 0.4) perks[id] = Math.floor(rng() * 8) - 1;
-  let s = Core.newState(rng() < 0.5 ? perks : null, 1 + Math.floor(rng() * 3), rng);
+  /* половина жизней с купленными сценариями старта: выбор не меняет колоду и шансы, до выбора всё заперто */
+  const scs = rng() < 0.5 ? Core.SC_IDS.filter(() => rng() < 0.6) : null;
+  let s = Core.newState(rng() < 0.5 ? perks : null, 1 + Math.floor(rng() * 3), rng, scs);
   check(s, 'старт');
+  if (s.scOptions) {
+    scLives++;
+    const t = JSON.parse(JSON.stringify(s));
+    if (Core.spin(t, rng) || Core.act(t, 'gym') || Core.canCharge(t) || Core.startBoost(t) || (t.traitOptions && Core.pickTrait(t, t.traitOptions[0])) || Core.pickScenario(t, 'zzz')) note('до выбора старта что-то сработало', JSON.stringify(t.scOptions));
+    const deck = JSON.stringify(s.deck), odds = JSON.stringify(Core.odds(s));
+    const id = s.scOptions[Math.floor(rng() * s.scOptions.length)];
+    if (!Core.pickScenario(s, id) || s.scOptions || Core.pickScenario(s, id)) note('выбор старта не сработал или повторился', id);
+    if (JSON.stringify(s.deck) !== deck || JSON.stringify(Core.odds(s)) !== odds) note('сценарий изменил колоду или шансы', id);
+    if (s.sc !== id || (Core.SCENARIOS[id] && Core.age(s) !== Core.SCENARIOS[id].age)) note('сценарий применён не так', id);
+    check(s, 'старт: ' + id);
+  } else if (scs && scs.length) note('купленные сценарии не предложены', scs.join());
   const style = Math.floor(rng() * 4);
   const rules = rng() < 0.4 ? Core.normAuto({ on: rng() < 0.9, reserve: Core.AUTO_RESERVES[Math.floor(rng() * Core.AUTO_RESERVES.length)], job: rng() < 0.5, kinds: Object.fromEntries(Core.AUTO_KINDS.map((k) => [k, rng() < 0.6])) }) : null;
   if (rules) autoLives++; /* 0 случайный, 1 жадный покупатель, 2 должник, 3 почти ничего не делает */
@@ -122,7 +138,7 @@ for (let i = 0; i < N; i++) {
   if (s.status === 'won') won++; else if (s.status === 'lost') lost++;
   try { const g = Core.goalsMet(s), p = Core.lifePoints(s); if (!Array.isArray(g) || !(p >= 1 && p <= 5)) note('цели или опыт сломаны', String(p)); } catch (e) { note('исключение в целях: ' + e.message, ''); }
 }
-console.log(`жизней с автопокупками ${autoLives}, автопокупок ${autoBought}`);
+console.log(`жизней с автопокупками ${autoLives}, автопокупок ${autoBought}; со сценарием старта ${scLives}`);
 console.log(`жизней ${lives}, спинов ${steps}, развилок ${forks} (золотых ${golds}), миллион ${won}, проигрыш ${lost}, пенсий ${retired}, максимум денег $${Math.round(maxMoney / 1e6)} млн`);
 const keys = Object.keys(bad);
 console.log(keys.length ? 'ПРОБЛЕМЫ:\n' + keys.map((k) => `  ${bad[k].n}×  ${k}  [${bad[k].d}]`).join('\n') : 'нарушений нет');

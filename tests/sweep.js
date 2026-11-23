@@ -10,15 +10,18 @@ const file = 'file://' + path.resolve(process.argv[2]);
     /* THEME=bill|dusk — купленная тема; LOOK=герой,дом,эпитафия (например street,nord,paper) — купленная косметика */
     /* COMFORT=1 — куплено «Удобство»: скорость ×8 и автопокупки всего, что есть в правилах, вместо ручных покупок */
     const COMFORT = !!process.env.COMFORT;
-    if (process.env.THEME || process.env.LOOK || COMFORT) await ctx.addInitScript(([t, lk, comfort]) => {
+    /* SCENARIO=loan|late|flat — куплен сценарий старта («Новые жизни»), жизнь начинается с него */
+    const SCN = process.env.SCENARIO || '';
+    if (process.env.THEME || process.env.LOOK || COMFORT || SCN) await ctx.addInitScript(([t, lk, comfort, scn]) => {
       if (sessionStorage.getItem('z2m-theme')) return;
       sessionStorage.setItem('z2m-theme', '1');
       const [hero, home, epitaph] = (lk || 'base,base,base').split(',');
       const owned = [t && 'theme-' + t, hero !== 'base' && 'hero-' + hero, home !== 'base' && 'home-' + home, epitaph !== 'base' && 'epitaph-' + epitaph].filter(Boolean);
       const M = { owned, look: { theme: t || 'base', hero, home, epitaph } };
       if (comfort) Object.assign(M, { owned: owned.concat(['speed8', 'autobuy']), speed: 8, autobuy: { on: true, reserve: 3, job: true, kinds: { gym: true, home: true, asset: true, reel: true, 'up:mult': true, 'up:star': true, 'up:insure': true, 'up:coach': true } } });
+      if (scn) M.owned = M.owned.concat(['sc-' + scn]);
       localStorage.setItem('zero-to-millionaire-v2', JSON.stringify({ M }));
-    }, [process.env.THEME || '', process.env.LOOK || '', COMFORT]);
+    }, [process.env.THEME || '', process.env.LOOK || '', COMFORT, SCN]);
     const p = await ctx.newPage();
     const errors = [];
     p.on('pageerror', (e) => errors.push(e.message));
@@ -30,6 +33,10 @@ const file = 'file://' + path.resolve(process.argv[2]);
     await p.click('#menuPlay');
     await p.waitForTimeout(500);
     await p.click('#modalBtn');
+    if (SCN) {
+      await p.waitForTimeout(500); await p.click(`#scOpts [data-sc="${SCN}"]`); await p.waitForTimeout(300);
+      if ((await p.evaluate(() => window.z2m.state().sc)) !== SCN) console.log('   СЦЕНАРИЙ НЕ ПРИМЕНИЛСЯ: ' + SCN);
+    }
     await p.evaluate(() => document.getElementById('autoBtn').click());
     await p.click('#tabBtn-' + tab);
     await p.waitForTimeout(1500);

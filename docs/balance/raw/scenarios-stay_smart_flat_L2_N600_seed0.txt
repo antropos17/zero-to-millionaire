@@ -1,0 +1,2 @@
+smart     наследие=2  побед 100%  миллион p10/med/p90: 37/38/39  проигравшие med: $NaN  должность: 9  развилок: 28.5  звёзд: 5.1  колода: 60  к 65: med $83.0 млн, $5M 100%, $25M 100%, $100M 34%
+   цели, % жизней: m50 100  m40 98  m35 1  m30 0  noreel 0  noinvest 0  nodebt 99  healthy 90  thin 0  nogold 100  levels 0  villa 75  unicorn 100  yes10 100  sets 83  quad 100  w1 100  w2 100  w3 34

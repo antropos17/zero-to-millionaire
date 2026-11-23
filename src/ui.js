@@ -33,7 +33,7 @@
   let M = freshMeta();
 
   function validState(s) {
-    if (!s || s.v !== 8) return false;
+    if (!s || s.v !== 9) return false;
     if (!Array.isArray(s.story) || !s.story.every((e) => e && typeof e === 'object' && typeof e.m === 'number' && isFinite(e.m) && typeof e.k === 'string')) return false;
     const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt', 'ads', 'starAt', 'saleAt'];
     const num = (v) => typeof v === 'number' && isFinite(v);
@@ -47,6 +47,8 @@
     if (!Array.isArray(s.lastForks) || !Array.isArray(s.flags.sets)) return false;
     if (!s.perks || !C.PERK_IDS.every((k) => num(s.perks[k]))) return false;
     if (s.trait != null && !C.TRAIT_IDS.includes(s.trait)) return false;
+    if (s.sc !== C.SC_BASE && !C.SC_IDS.includes(s.sc)) return false;
+    if (s.scOptions != null && !(Array.isArray(s.scOptions) && s.scOptions[0] === C.SC_BASE && s.scOptions.length > 1 && s.scOptions.every((x) => x === C.SC_BASE || C.SC_IDS.includes(x)))) return false;
     if (s.traitOptions != null && !(Array.isArray(s.traitOptions) && s.traitOptions.length && s.traitOptions.every((t) => C.TRAIT_IDS.includes(t)))) return false;
     if (!['playing', 'won', 'lost'].includes(s.status)) return false;
     if (!C.FOCI.includes(s.focus)) return false;
@@ -483,13 +485,14 @@
   let forkOpen = false;
   let chargeOpen = false;
   let traitOpen = false;
+  let scOpen = false;
   let adOpen = false;
   let menuOpen = true;
   let storeOpen = false;
   let autoOpen = false;
   const spinMs = () => 1000 / M.speed;
   const holdMs = () => 800 / M.speed;
-  const blocked = () => menuOpen || storeOpen || autoOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
+  const blocked = () => menuOpen || storeOpen || autoOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen || !!S.fork || !!S.traitOptions || !!S.scOptions || S.status !== 'playing';
 
   /* chargedSym: символ «Своего месяца», если игрок потратил звезду */
   function startSpin(chargedSym) {
@@ -669,7 +672,7 @@
     if (!adOpen) return;
     stopAd();
     openedAt = Date.now();
-    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
+    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (scOpen) $('scBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
   }
   /* Купленное «Без рекламы» отдаёт тот же бонус сразу, без ролика: суммы и ограничения не меняются */
   function ownsNoAds() { return C.noAds(M.owned); }
@@ -738,7 +741,7 @@
     if (sym) { sfx.fork(); startSpin(sym); } else schedule();
   }
   function askCharge() {
-    if (!C.canCharge(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.canCharge(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     clearTimeout(timer);
     if (phase === 'spinning') { wantCharge = true; anims.slice().forEach((a) => a.finish()); } else openCharge();
   }
@@ -753,7 +756,7 @@
   const UP_FLOAT = { mult: 'Множитель!', star: 'Звезда быстрее', insure: 'Счета мягче', coach: 'Опыт ×2' };
   const FLOAT = { job: () => 'Повышение!', home: () => 'Новоселье!', asset: () => `+${money(C.assetIncome(S, S.assets - 1))} в мес.`, gym: () => 'здоровье +20', reel: () => 'Четыре барабана!' };
   function useBoost(li) {
-    if (!C.boostReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.boostReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.startBoost(S)) { schedule(); return; }
       sfx.big(); charAct('jump'); confetti(20, false);
@@ -764,7 +767,7 @@
     });
   }
   function useStar(li) {
-    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.chargeStar(S)) { schedule(); return; }
       sfx.big();
@@ -775,7 +778,7 @@
     });
   }
   function useSale(li) {
-    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen) return;
     withAd(() => {
       if (!C.startSale(S)) { schedule(); return; }
       sfx.big();
@@ -1236,7 +1239,12 @@
     hideModal();
     if (fn) fn();
   }
-  const resume = () => { if (menuOpen) return; if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else schedule(); };
+  /* Начало жизни: сначала выбор старта (если куплены сценарии), потом черта. true — окно открыто */
+  function openStart() {
+    if (S.scOptions) openSc(); else if (S.traitOptions) openTrait(); else return false;
+    return true;
+  }
+  const resume = () => { if (menuOpen) return; if (openStart()) return; if (S.fork) openFork(); else schedule(); };
 
   function showHelp() {
     const row = (icon, text) => `<li><img src="${ICON[icon]}" alt=""><span>${text}</span></li>`;
@@ -1338,7 +1346,7 @@
 
   function newLife() {
     if (S.status === 'playing') return;
-    S = C.newState(M.perks, S.life + 1);
+    S = C.newState(M.perks, S.life + 1, null, C.ownedScenarios(M.owned));
     M.log = [];
     oddsKey = ''; goalsKey = '';
     clearHits();
@@ -1347,8 +1355,41 @@
     showTab('shop');
     render();
     save();
+    if (!openStart()) schedule(600);
+  }
+
+  /* ---------- Старт жизни: стандартный или купленный сценарий (полка «Новые жизни») ---------- */
+  const SC_ICON = { base: 'star', loan: 'study', late: 'work', flat: 'home' };
+  function openSc() {
+    if (!S.scOptions || menuOpen || storeOpen) return;
+    scOpen = true;
+    clearTimeout(timer);
+    $('scIcon').src = ICON.home;
+    $('scKind').textContent = `Жизнь ${S.life}: с чего начать`;
+    $('scOpts').innerHTML = S.scOptions.map((id) => {
+      const sc = C.SCENARIOS[id];
+      const name = sc ? sc.name : 'Обычный старт';
+      const note = sc ? sc.note : `18 лет и ${S.money ? money(S.money) + ' от семьи' : 'ноль на счету'}`;
+      return `<button class="opt" type="button" data-sc="${id}"><img src="${ICON[SC_ICON[id] || 'star']}" alt=""><b>${esc(name)}</b><span>${esc(note)}</span></button>`;
+    }).join('');
+    $('scLay').hidden = false;
+    openedAt = Date.now();
+    $('scBox').focus();
+  }
+  function chooseSc(id) {
+    if (!scOpen || Date.now() - openedAt < GUARD) return;
+    if (!C.pickScenario(S, id)) return;
+    scOpen = false;
+    $('scLay').hidden = true;
+    sfx.fork();
+    const sc = C.SCENARIOS[id];
+    if (sc) { pushLog(sc.intro, null, 'plain'); setMsg(sc.intro, null, 'plain'); }
+    shownMoney = S.money;
+    render();
+    save();
     if (S.traitOptions) openTrait(); else schedule(600);
   }
+  $('scOpts').addEventListener('click', (e) => { const b = e.target.closest('[data-sc]'); if (b) chooseSc(b.dataset.sc); });
 
   /* ---------- Черта: одна из трёх на старте жизни ---------- */
   function openTrait() {
@@ -1397,7 +1438,7 @@
 
   /* Пока вкладка закрыта или скрыта, жизнь идёт: месяц за минуту, не больше года за раз */
   function catchUp(ms) {
-    if (!M.auto || S.status !== 'playing' || S.fork || S.traitOptions) return false;
+    if (!M.auto || S.status !== 'playing' || S.fork || S.traitOptions || S.scOptions) return false;
     const n = Math.min(C.YEAR, Math.floor(ms / 60000));
     if (n < 1) return false;
     const before = S.money;
@@ -1448,7 +1489,7 @@
     render(); save();
     if (M.sound) sfx.good();
   });
-  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !storeOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen) showHelp(); });
+  $('helpBtn').addEventListener('click', () => { if (!menuOpen && !storeOpen && !modalOpen && !forkOpen && !chargeOpen && !traitOpen && !scOpen) showHelp(); });
   document.querySelector('.focus').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-focus]');
     if (b) setFocus(b.dataset.focus);
@@ -1490,11 +1531,11 @@
   function resetAll() {
     clearTimeout(timer);
     anims.slice().forEach((a) => a.cancel());
-    anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false;
-    $('chargeLay').hidden = true; $('traitLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
+    anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false; scOpen = false;
+    $('chargeLay').hidden = true; $('traitLay').hidden = true; $('scLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
     store.clear();
     const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look, autobuy: M.autobuy };
-    S = C.newState(null, 1);
+    S = C.newState(null, 1, null, C.ownedScenarios(M.owned));
     M = Object.assign(freshMeta(), keep);
     hideModal();
     oddsKey = ''; goalsKey = '';
@@ -1503,7 +1544,7 @@
     shownMoney = 0; away = 0;
     setMsg('Новая игра. Тебе 18 лет и ноль на счету.', null, 'plain');
     showTab('shop');
-    render(); save(); schedule(600);
+    render(); save(); if (!openStart()) schedule(600);
   }
   /* Кнопка с подтверждением: первое нажатие спрашивает, второе в течение четырёх секунд делает */
   function twoStep(btn, idle, ask, run) {
@@ -1550,7 +1591,7 @@
   $('autoRes').insertAdjacentHTML('beforeend', C.AUTO_RESERVES.map((r) => `<button class="btn btn-small" type="button" role="radio" data-res="${r}">× ${r}</button>`).join(''));
   $('autoList').innerHTML = AUTO_RULES.map(([k, name, note]) => `<li><button class="auto-sw" type="button" role="switch" data-rule="${k}" aria-checked="false"><i aria-hidden="true"></i><b>${esc(name)}</b><span>${esc(note)}</span></button></li>`).join('');
   function openAuto() {
-    if (!ownsAuto() || autoOpen || menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (!ownsAuto() || autoOpen || menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
     autoOpen = true;
     clearTimeout(timer);
     if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
@@ -1567,7 +1608,7 @@
     const gone = away;
     away = 0;
     if (menuOpen) return;
-    if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else if (!catchUp(gone)) schedule();
+    if (openStart()) return; if (S.fork) openFork(); else if (!catchUp(gone)) schedule();
   }
   function setAuto(patch) {
     M.autobuy = C.normAuto(Object.assign({}, M.autobuy, patch));
@@ -1616,7 +1657,7 @@
     $('menuBox').focus();
   }
   function openMenu() {
-    if (menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
     if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
     save();
     showMenu();
@@ -1624,15 +1665,18 @@
   /* Вход в игру из меню: продолжает ровно с того места, где жизнь остановилась */
   function enterGame() {
     if (modalOpen) return;
+    const entered0 = entered;
     menuOpen = false; entered = true;
     $('menuLay').hidden = true;
     pulse(document.querySelector('.app'), 'enter');
+    /* первая жизнь ещё не начата (сохранения нет): сценарии, купленные в магазине меню, предлагаются сразу */
+    if (!entered0 && !hasSave && S.life === 1 && S.month === 0 && !S.scOptions && C.ownedScenarios(M.owned).length) S = C.newState(null, 1, null, C.ownedScenarios(M.owned));
     const gone = away;
     away = 0;
     save();
     if (S.status !== 'playing') endLife();
     else if (!M.seenHelp) showHelp();
-    else if (S.traitOptions) openTrait();
+    else if (openStart()) { /* выбор старта или черты */ }
     else if (maybeMillion()) { /* окно первого миллиона */ }
     else if (S.fork) openFork();
     else if (!catchUp(gone)) schedule(600);
@@ -1739,7 +1783,7 @@
     }).join('');
   }
   function openStore() {
-    if (storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    if (storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || scOpen || adOpen) return;
     if (!menuOpen && S.status !== 'playing') return;
     storeFrom = menuOpen ? 'menu' : 'game';
     clearTimeout(timer);
@@ -1760,7 +1804,7 @@
     if (maybeMillion()) return;
     const gone = away;
     away = 0;
-    if (S.traitOptions) openTrait(); else if (S.fork) openFork(); else if (!catchUp(gone)) schedule(300);
+    if (openStart()) return; if (S.fork) openFork(); else if (!catchUp(gone)) schedule(300);
   }
   function storeBuy(id) {
     if (payOpen || !C.STORE[id] || M.owned.includes(id)) return;
@@ -1852,7 +1896,7 @@
       const gone = hiddenAt ? Date.now() - hiddenAt : 0;
       hiddenAt = null;
       if (menuOpen || storeOpen || autoOpen) { if (entered) away += gone; }
-      else if (!modalOpen && !forkOpen && !chargeOpen && !traitOpen && !catchUp(gone)) schedule();
+      else if (!modalOpen && !forkOpen && !chargeOpen && !traitOpen && !scOpen && !catchUp(gone)) schedule();
     }
   });
   window.addEventListener('pagehide', save);
@@ -1883,6 +1927,8 @@
   const oldPts = saved && saved.S && saved.S.v < 6 && typeof saved.S.legacy === 'number' && isFinite(saved.S.legacy) ? Math.max(0, Math.round(saved.S.legacy)) : 0;
   if (saved && validState(C.migrate(saved.S))) {
     S = saved.S;
+    /* в окне старта только купленные сценарии: чужой в сохранении не предлагается */
+    if (S.scOptions) { const own = C.ownedScenarios(M.owned); S.scOptions = S.scOptions.filter((id) => id === C.SC_BASE || own.includes(id)); if (S.scOptions.length < 2) S.scOptions = null; }
     M.pts += oldPts;
     away = saved.t ? Date.now() - saved.t : 0;
     bootT = saved.t || Date.now();

@@ -476,7 +476,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, KEY);
   await p.reload(); await enter(p);
   s = await st(p);
-  ok('старое сохранение продолжилось с колодой', s.v === 8 && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
+  ok('старое сохранение продолжилось с колодой', s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
   await p.close();
 
   /* 10. Хранилище запрещено */
@@ -627,6 +627,10 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('магазин закрывается в один тап, в меню видна благодарность', !(await p.locator('#storeLay').isVisible()) && await p.locator('#menuThanks').isVisible() && /ничего не меняет в игре/i.test(await p.evaluate(() => Core.STORE.thanks.note)));
   /* темы меняют только цвета: ни одна рамка не сдвигается */
   await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn');
+  /* сценарии куплены до первого входа: первая жизнь начинается с выбора старта */
+  await p.waitForTimeout(300);
+  ok('купленные до первого входа сценарии предложены в первой жизни', await p.locator('#scLay').isVisible() && (await p.locator('#scOpts [data-sc]').count()) === 4);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="base"]'); await p.waitForTimeout(200);
   await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); });
   const boxes = () => p.evaluate(() => ['.stage', '.scene-wrap', '.hud', '.slot', '.desk', '.tabs', '.ctrl', '#spinBtn', '#money', '.chips', '.focus', '#reels', '#storeBtn']
     .concat(Array.from(document.querySelectorAll('#shop li')).map((li) => `#shop li[data-kind="${li.dataset.kind}"]`))
@@ -805,6 +809,51 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const ad = auto.trail.findIndex((x, i) => x !== hand.trail[i]);
   ok(`автопокупки равны ручным нажатиям тех же покупок в те же месяцы: ${NA} месяцев совпадают до поля`, ad === -1 && auto.trail.length === hand.trail.length && nb.length > 5, ad === -1 ? `автопокупок ${nb.length}: ${[...new Set(nb)].join(', ')}` : `расходятся с месяца ${ad + 1}`);
   ok('автопокупки не уводят деньги в минус', auto.trail.every((x) => JSON.parse(x).money >= 0));
+
+  /* 17. Новые жизни: платные сценарии старта видны только купленные, колоду и шансы не меняют, на экране проигрыша их нет */
+  p = await mk();
+  ok('без покупки: окна выбора старта нет', !(await p.locator('#scLay').isVisible()) && (await st(p)).scOptions === null && (await st(p)).sc === 'base');
+  await p.click('#storeBtn');
+  const livesText = await p.evaluate(() => [...document.querySelectorAll('.store-shelf')].find((x) => /Новые жизни/.test(x.querySelector('h3').textContent)).textContent);
+  const scNames = await p.evaluate(() => ['sc-loan', 'sc-late', 'sc-flat'].map((id) => Core.STORE[id].name));
+  ok('полка «Новые жизни»: три сценария, у каждого сказано, что колода, шансы и цены те же', scNames.every((n) => livesText.includes(n)) && (livesText.match(/Колода, шансы, выплаты и цены те же/g) || []).length === 3, livesText.slice(0, 200));
+  await p.click('[data-buy="sc-late"]'); await p.click('#payCancel');
+  await p.click('[data-buy="sc-loan"]'); await p.click('#payOk'); await p.waitForTimeout(50);
+  await p.click('#storeClose'); await p.waitForTimeout(200);
+  ok('куплен один сценарий, отказ от второго ничего не купил, текущая жизнь не тронута', JSON.stringify(await owned(p)) === '["sc-loan"]' && (await st(p)).scOptions === null && !(await p.locator('#scLay').isVisible()));
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  const lossText = await p.textContent('#modalBox');
+  ok('проигрыш у владельца сценария: в окне нет ни сценариев, ни магазина, только новая жизнь и опыт', (await p.locator('#overlay .modal button:visible').count()) === 2 && !/Студент|Второй шанс|однушк|Новые жизни|магазин|реклам/i.test(lossText), lossText.slice(0, 160));
+  await p.waitForTimeout(450); await p.click('#modalBtn'); await p.waitForTimeout(200);
+  let s17 = await st(p);
+  ok('новая жизнь: сначала выбор старта, черта ждёт', await p.locator('#scLay').isVisible() && !(await p.locator('#traitLay').isVisible()) && JSON.stringify(s17.scOptions) === '["base","loan"]' && Array.isArray(s17.traitOptions));
+  ok('в окне только стандартный старт и купленный сценарий', JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('#scOpts [data-sc]')].map((b) => b.dataset.sc))) === '["base","loan"]');
+  await p.waitForTimeout(1800);
+  await p.evaluate(() => document.getElementById('spinBtn').click()); await p.waitForTimeout(300);
+  ok('пока старт не выбран, слот стоит даже по нажатию «Крутить»', (await st(p)).month === 0 && (await st(p)).scOptions !== null);
+  await p.reload(); await enter(p);
+  ok('выбор старта возвращается после перезагрузки', await p.locator('#scLay').isVisible());
+  const deck0 = JSON.stringify((await st(p)).deck);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="loan"]'); await p.waitForTimeout(200);
+  s17 = await st(p);
+  const L = await p.evaluate(() => Core.SCENARIOS.loan);
+  ok('сценарий применён: возраст, долг, навык; колода та же; дальше выбор черты', s17.sc === 'loan' && s17.scOptions === null && 18 + Math.floor(s17.month / 12) === L.age && s17.money < 0 && s17.skill >= L.skill && JSON.stringify(s17.deck) === deck0 && await p.locator('#traitLay').isVisible() && !(await p.locator('#scLay').isVisible()), JSON.stringify({ m: s17.month, money: s17.money, skill: s17.skill }));
+  ok('вступление сценария в ленте', (await meta(p)).log.some((e) => e.text === L.intro));
+  await p.waitForTimeout(450); await p.locator('#traitOpts button').first().click(); await p.waitForTimeout(200);
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  ok('эпитафия сценарной жизни начинается с её истории', ((await p.textContent('#modalBody .epitaph')) || '').startsWith(L.epi), await p.textContent('#modalBody .epitaph'));
+  await p.waitForTimeout(450); await p.click('#modalBtn'); await p.waitForTimeout(200);
+  await p.waitForTimeout(450); await p.click('#scOpts [data-sc="base"]'); await p.waitForTimeout(200);
+  s17 = await st(p);
+  ok('стандартный старт ничего не меняет', s17.sc === 'base' && s17.month === 0 && s17.money === (await p.evaluate(() => Core.newState(window.z2m.state().perks, 3).money)) && s17.skill === 0 && await p.locator('#traitLay').isVisible());
+  await p.evaluate(() => { window.z2m.state().traitOptions = null; });
+  await p.reload();
+  await p.waitForSelector('#menuNew', { state: 'visible' });
+  await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
+  ok('«Новая игра»: покупка на месте, первая жизнь тоже начинается с выбора старта', (await st(p)).life === 1 && JSON.stringify(await owned(p)) === '["sc-loan"]' && await p.locator('#scLay').isVisible() && !(await p.locator('#traitLay').isVisible()));
+  await p.close();
 
   /* 11. Бонусы за рекламу: звезда, скидка, лимит на жизнь, четвёртая черта, честные подписи */
   p = await mk();
