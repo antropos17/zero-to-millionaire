@@ -78,6 +78,10 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     v4: { v: 4, money: 40000, month: 200, job: 5, skill: 80, health: 44, network: 9, home: 3, assets: 4, deck: { work: 11, study: 5, health: 3, network: 2, chance: 6, coin: 4, bill: 3 }, bought: { study: 2, health: 0, network: 0, chance: 0 }, billsCut: 1, cut: 0, charge: 10, xp: { work: 80, study: 30, health: 2, network: 1 }, reels4: true, focus: 'study', fork: 'overtime', lastForks: ['blog', '!kitten'], ms: 3, trait: 'lucky', traitOptions: null, flags: { debt: true, low: true, yes: 4 }, legacy: 5, life: 3, status: 'playing', peak: 41000, wonAt: null, earned: 90000 },
     v5won: { v: 5, money: 1200000, month: 300, job: 8, skill: 200, health: 70, network: 12, home: 4, assets: 6, deck: { work: 14, study: 6, health: 3, network: 2, chance: 9, coin: 6, bill: 1 }, bought: { study: 3, health: 0, network: 0, chance: 0 }, billsCut: 3, cut: 0, charge: 0, xp: { work: 90, study: 80, health: 2, network: 1 }, reels4: true, up: { mult: 2, star: 1, insure: 0, coach: 1 }, focus: 'work', fork: null, lastForks: [], ms: 6, trait: null, traitOptions: null, flags: { debt: false, low: false, yes: 2, gold: 1 }, legacy: 7, life: 4, status: 'won', peak: 1200000, wonAt: 300, earned: 2000000 },
   };
+  /* v6 и v7: последние версии до лимита рекламы; в v7 золото уже взято дважды и идёт «Удачный год» */
+  const v6 = { v: 6, money: 30000, month: 150, job: 4, skill: 60, health: 70, network: 8, home: 2, assets: 3, deck: { work: 10, study: 5, health: 3, network: 2, chance: 5, coin: 3, bill: 3, wild: 0 }, bought: { study: 2, health: 0, network: 0, chance: 0, wild: 0 }, billsCut: 1, cut: 0, charge: 3, xp: { work: 40, study: 20, health: 0, network: 0 }, reels4: false, up: { mult: 1, star: 0, insure: 1, coach: 0 }, boost: 0, boostAt: 40, focus: 'work', fork: null, lastForks: ['blog'], ms: 3, trait: 'frugal', traitOptions: null, flags: { debt: false, low: false, yes: 3, gold: 1, sets: ['intern'], quad: false }, perks: { cash: 1, genes: 0, tough: 0, ties: 0, school: 0, sale: 1, star: 0, traits: 0, joker: 0 }, life: 2, status: 'playing', peak: 30000, wonAt: null, won: null, earned: 60000 };
+  olds.v6 = v6;
+  olds.v7 = Object.assign(JSON.parse(JSON.stringify(v6)), { v: 7, boost: 5, boostAt: 180, flags: Object.assign({}, v6.flags, { gold: 2 }), story: [{ m: 20, k: 'job', i: 1 }, { m: 90, k: 'fork', t: 'Свадьба', pick: 'gold', d: 0 }] });
   for (const [name, S] of Object.entries(olds)) {
     const before = errors.length;
     const p = await open(null, JSON.stringify({ S, M: { seenHelp: true, auto: false, goals: ['m50'], best: 400 }, t: Date.now() }));
@@ -85,7 +89,15 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.click('#menuPlay'); await p.waitForTimeout(500);
     const s = await st(p);
     const pts = await p.textContent('#ptsLine');
-    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 7 && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 8 && s.ads === Math.min(16, (S.flags && S.flags.gold) || 0) && s.sale === false && s.trait4 === false && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    if (name === 'v6' || name === 'v7') {
+      const head = await p.textContent('#adsHead');
+      const rows = await p.evaluate(() => ['boost', 'ad-star', 'ad-sale'].map((k) => document.querySelector(`li[data-kind="${k}"] .btn-buy`).textContent).join(' | '));
+      ok(`сохранение ${name}: черта, наследие и летопись на месте, бонусы считаются с уже взятого золота`, s.trait === 'frugal' && s.perks.sale === 1 && s.deck.work === 10 && (name === 'v6' ? s.story.length === 0 && s.boost === 0 : s.story.length === 2 && s.boost === 5 && s.boostAt === 180) && head === `Бонусы · ${S.flags.gold} из 16` && (name === 'v7' ? /Идёт/.test(rows) : true), JSON.stringify({ head, rows, story: s.story.length }));
+      /* скидка за рекламу перемножается с «Аскетом» и «Умением торговаться» */
+      const c = await p.evaluate(() => { const t = JSON.parse(JSON.stringify(window.z2m.state())); const a = Core.costOf(t, 'home'); t.sale = true; return { a, b: Core.costOf(t, 'home'), list: Core.homeCost(t) }; });
+      ok(`сохранение ${name}: скидка 20% поверх «Аскета» и перка`, c.a === Math.round(14000 * 0.85 * 0.95) && c.b === Math.round(c.a * 0.8) && c.list === c.a, JSON.stringify(c));
+    }
     if (name === 'v4') ok('сохранение v4: развилка на месте, три варианта', await p.locator('#forkLay').isVisible() && (await p.locator('#forkLay .opt:visible').count()) === 3);
     if (name === 'v5won') ok('сохранение v5 с победой: окно конца жизни, старый опыт стал очками', /^Миллион в/.test(await p.textContent('#modalTitle')) && /опыт: (\d+)$/.test(pts) && Number(pts.match(/(\d+)$/)[1]) >= 7 + 2, pts);
     await p.close();

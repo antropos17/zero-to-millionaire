@@ -1,0 +1,3 @@
+# AD=20 STARR=24 SALEC=0.1 SALER=24
+smart+ad  наследие=0  побед 100%  миллион p10/med/p90: 37/38/40  проигравшие med: $NaN  должность: 7  развилок: 12.6  звёзд: 10.3  колода: 52  реклама med/max: 20/20, упёрлись в лимит 97%
+   цели, % жизней: m50 100  m40 92  m35 1  m30 0  noreel 0  noinvest 0  nodebt 98  healthy 80  thin 0  nogold 4  levels 0  villa 15  unicorn 8  yes10 49  sets 62  quad 99  w1 0  w2 0  w3 0

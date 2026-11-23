@@ -436,6 +436,9 @@ img, svg { display: block; }
 @keyframes flash { 30% { background: #D5F3E3; } }
 .shop li.gold .btn-buy:not(:disabled) { background: linear-gradient(180deg, #FFE27A, var(--yellow)); }
 .shop li.gold h3 { color: #7A5200; }
+/* скидка за рекламу: метка в углу кнопки, цена на кнопке уже со скидкой */
+.shop-act { position: relative; }
+.shop-act[data-sale]::before { content: attr(data-sale); position: absolute; z-index: 1; top: -7px; right: -5px; padding: 0 5px; border: 2px solid var(--navy); border-radius: 8px; background: var(--yellow); color: var(--navy); font-size: 11px; font-weight: 900; line-height: 14px; pointer-events: none; }
 .life-btns[hidden] { display: none; }
 .life-btns { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
 .life-btns[hidden] { display: none; }
@@ -574,6 +577,9 @@ img, svg { display: block; }
 .opt-g { background: linear-gradient(180deg, #FFE27A, var(--yellow)); }
 .opt-g i { font-style: normal; font-size: 11.5px; font-weight: 900; letter-spacing: 0.2px; text-transform: uppercase; color: #7A5200; }
 .opt-g[hidden] { display: none; }
+/* окно рекламы выше остальных окон: его открывают из развилки, из окна черты и из окна «Пока тебя не было» */
+#adLay { z-index: 55; }
+.trait-more { margin-top: 9px; }
 .ad-bar { height: 16px; border: 2px solid var(--navy); border-radius: 999px; overflow: hidden; background: var(--paper-2); }
 .ad-fill { height: 100%; width: 0; background: var(--yellow); }
 .ad-left { font-weight: 900; font-variant-numeric: tabular-nums; text-align: center; }

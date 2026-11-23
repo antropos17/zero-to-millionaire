@@ -509,6 +509,9 @@ img, svg { display: block; }
 @keyframes flash { 30% { background: #D5F3E3; } }
 .shop li.gold .btn-buy:not(:disabled) { background: linear-gradient(180deg, #FFE27A, var(--yellow)); }
 .shop li.gold h3 { color: #7A5200; }
+/* скидка за рекламу: метка в углу кнопки, цена на кнопке уже со скидкой */
+.shop-act { position: relative; }
+.shop-act[data-sale]::before { content: attr(data-sale); position: absolute; z-index: 1; top: -7px; right: -5px; padding: 0 5px; border: 2px solid var(--navy); border-radius: 8px; background: var(--yellow); color: var(--navy); font-size: 11px; font-weight: 900; line-height: 14px; pointer-events: none; }
 .life-btns[hidden] { display: none; }
 .life-btns { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
 .life-btns[hidden] { display: none; }
@@ -647,6 +650,9 @@ img, svg { display: block; }
 .opt-g { background: linear-gradient(180deg, #FFE27A, var(--yellow)); }
 .opt-g i { font-style: normal; font-size: 11.5px; font-weight: 900; letter-spacing: 0.2px; text-transform: uppercase; color: #7A5200; }
 .opt-g[hidden] { display: none; }
+/* окно рекламы выше остальных окон: его открывают из развилки, из окна черты и из окна «Пока тебя не было» */
+#adLay { z-index: 55; }
+.trait-more { margin-top: 9px; }
 .ad-bar { height: 16px; border: 2px solid var(--navy); border-radius: 999px; overflow: hidden; background: var(--paper-2); }
 .ad-fill { height: 100%; width: 0; background: var(--yellow); }
 .ad-left { font-weight: 900; font-variant-numeric: tabular-nums; text-align: center; }
@@ -961,9 +967,11 @@ html[data-theme="dusk"] .screen { background: radial-gradient(circle at 50% 18%,
 
     <div class="tab-body" id="tab-shop" role="tabpanel" aria-labelledby="tabBtn-shop">
       <div class="shop-groups" id="shop">
-      <h3 class="sub">Бонусы</h3>
+      <h3 class="sub" id="adsHead">Бонусы</h3>
       <ul class="shop">
         <li data-kind="boost" class="gold"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="ad-star" class="gold"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
+        <li data-kind="ad-sale" class="gold"><img alt=""><div class="shop-text"><h3></h3><p></p></div><div class="shop-act"><button class="btn btn-buy" type="button"><b></b><span></span></button></div></li>
       </ul>
       <h3 class="sub">Жизнь</h3>
       <ul class="shop">
@@ -1145,6 +1153,7 @@ html[data-theme="dusk"] .screen { background: radial-gradient(circle at 50% 18%,
     <div class="fork-head"><img id="traitIcon" alt=""><div><p class="fork-kind" id="traitKind"></p><h2 id="traitTitle">Выбери черту</h2></div></div>
     <p>Действует всю эту жизнь.</p>
     <div class="fork-opts charge-opts" id="traitOpts"></div>
+    <button class="opt opt-g trait-more" id="traitMore" type="button" hidden><i></i><b>Показать ещё одну черту</b><span>Четвёртый вариант из тех же черт. Один раз за жизнь</span></button>
   </div>
 </div>
 
@@ -1202,6 +1211,13 @@ const Core = (() => {
   SETS.forEach((t) => { SET_BY[t.id] = t; });
   /* «Удачный год» за рекламу: столько месяцев все доходы вдвое, потом столько же месяцев отдыха */
   const BOOST_LEN = 12, BOOST_REST = 24;
+  /* Рекламные бонусы: не больше AD_LIMIT за жизнь. В счёт идут золотые варианты, «Удачный год»,
+     заряд звезды, скидка и четвёртая черта. Удвоение за время отсутствия в счёт не идёт. */
+  const AD_LIMIT = 16;
+  /* «Зарядить звезду»: «Свой месяц» готов сразу, потом столько месяцев отдыха */
+  const STAR_REST = 24;
+  /* «Скидка»: следующая покупка во вкладке «Покупки» дешевле на SALE_CUT, после неё столько месяцев отдыха */
+  const SALE_CUT = 0.2, SALE_REST = 24;
   /* Наследие: постоянные улучшения за опыт прошлых жизней. Действуют с начала следующей жизни. */
   const PERKS = {
     cash: { name: 'Семейный капитал', costs: [1, 2, 3, 4], vals: [0, 500, 2000, 6000, 15000] },
@@ -1319,13 +1335,14 @@ const Core = (() => {
   function newState(perks, life, rng) {
     const P = normPerks(perks), start = PERKS.cash.vals[P.cash];
     const s = {
-      v: 7,
+      v: 8,
       money: start, month: 0, job: 0, skill: 0, health: 100, network: PERKS.ties.vals[P.ties],
       home: 0, assets: 0,
       deck: Object.assign({}, START_DECK, { study: START_DECK.study + P.school, wild: P.joker }),
       bought: { study: 0, health: 0, network: 0, chance: 0, wild: 0 }, billsCut: 0, cut: 0,
       charge: P.star ? CHARGE_NEED[0] : 0, xp: { work: 0, study: 0, health: 0, network: 0 }, reels4: false,
       up: { mult: 0, star: 0, insure: 0, coach: 0 }, boost: 0, boostAt: 0,
+      ads: 0, starAt: 0, saleAt: 0, sale: false, trait4: false,
       focus: 'work', fork: null, lastForks: [], ms: 0,
       trait: null, traitOptions: null,
       flags: { debt: false, low: false, yes: 0, gold: 0, sets: [], quad: false },
@@ -1348,6 +1365,17 @@ const Core = (() => {
     s.trait = id;
     s.traitOptions = null;
     if (TRAITS[id].apply) TRAITS[id].apply(s);
+    return true;
+  }
+
+  /* «Четвёртая черта» за рекламу: ещё один вариант из тех черт, что не показаны. Раз за жизнь. */
+  const traitMore = (s) => !!s.traitOptions && !s.trait4 && s.ads < AD_LIMIT && TRAIT_IDS.some((id) => !s.traitOptions.includes(id));
+  function extraTrait(s, rng) {
+    if (!traitMore(s)) return false;
+    rng = rng || Math.random;
+    const pool = TRAIT_IDS.filter((id) => !s.traitOptions.includes(id));
+    s.traitOptions.push(pool[Math.floor(rng() * pool.length)]);
+    s.trait4 = true; s.ads += 1;
     return true;
   }
 
@@ -1377,6 +1405,12 @@ const Core = (() => {
       delete s.legacy;
     }
     if (s && s.v === 6) { s.v = 7; s.story = []; }
+    /* до v8 лимита не было: в счёт идут золотые варианты, которые уже взяты, остальное отсчитывается заново */
+    if (s && s.v === 7) {
+      s.v = 8;
+      s.ads = Math.min(AD_LIMIT, (s.flags && s.flags.gold) | 0);
+      s.starAt = 0; s.saleAt = 0; s.sale = false; s.trait4 = false;
+    }
     return s;
   }
 
@@ -2145,7 +2179,9 @@ const Core = (() => {
     if (!s.fork) return null;
     const f = FORKS[s.fork].make(s), g = goldOption(s, s.fork);
     const opt = (o) => ({ label: o.label, note: o.note, enabled: o.cost == null || s.money >= o.cost });
-    return { id: s.fork, title: f.title, text: f.text, options: [opt(f.a), opt(f.b)], gold: g ? opt(g) : null };
+    const gold = g ? opt(g) : null;
+    if (gold && s.ads >= AD_LIMIT) { gold.enabled = false; gold.limit = true; }
+    return { id: s.fork, title: f.title, text: f.text, options: [opt(f.a), opt(f.b)], gold };
   }
 
   /* Летопись: главные события жизни, из них в конце собирается эпитафия */
@@ -2167,8 +2203,8 @@ const Core = (() => {
     const id = s.fork, f = FORKS[id].make(s);
     const isGold = idx === 'gold';
     const o = isGold ? goldOption(s, id) : idx === 0 ? f.a : f.b;
-    if (!o || (o.cost != null && s.money < o.cost)) return null;
-    if (isGold) s._gold = true;
+    if (!o || (o.cost != null && s.money < o.cost) || (isGold && s.ads >= AD_LIMIT)) return null;
+    if (isGold) { s._gold = true; s.ads += 1; }
     const before = s.money, h0 = s.health, sk = s.skill, nw = s.network, job0 = s.job, home0 = s.home, as0 = s.assets;
     const d0 = Object.assign({}, s.deck);
     let out;
@@ -2327,11 +2363,35 @@ const Core = (() => {
     s.status = 'won'; s.fork = null;
     return true;
   }
-  const boostReady = (s) => s.status === 'playing' && !s.fork && !s.traitOptions && s.boost === 0 && s.month >= s.boostAt;
+  /* ---------- Рекламные бонусы ---------- */
+  /* ready: кнопку можно нажать сейчас. Сам бонус выдаётся и тогда, когда за время ролика открылась развилка:
+     досмотренная реклама всегда даёт обещанное. */
+  const adsLeft = (s) => Math.max(0, AD_LIMIT - s.ads);
+  const adOpen = (s) => s.status === 'playing' && !s.fork && !s.traitOptions;
+  const boostCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.boost === 0 && s.month >= s.boostAt;
+  const boostReady = (s) => adOpen(s) && boostCan(s);
   function startBoost(s) {
-    if (s.status !== 'playing' || s.boost > 0 || s.month < s.boostAt) return false;
+    if (!boostCan(s)) return false;
     s.boost = BOOST_LEN;
     s.boostAt = s.month + BOOST_LEN + BOOST_REST;
+    s.ads += 1;
+    return true;
+  }
+  const starCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.month >= s.starAt && s.charge < chargeMax(s);
+  const starReady = (s) => adOpen(s) && starCan(s);
+  function chargeStar(s) {
+    if (!starCan(s)) return false;
+    s.charge = chargeMax(s);
+    s.starAt = s.month + STAR_REST;
+    s.ads += 1;
+    return true;
+  }
+  const saleCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && !s.sale && s.month >= s.saleAt;
+  const saleReady = (s) => adOpen(s) && saleCan(s);
+  function startSale(s) {
+    if (!saleCan(s)) return false;
+    s.sale = true;
+    s.ads += 1;
     return true;
   }
 
@@ -2342,17 +2402,25 @@ const Core = (() => {
   const reelCost = (s) => (s.reels4 ? null : price(s, REEL4_COST));
   const upCost = (s, id) => (UPGRADES[id] && s.up[id] < UPGRADES[id].costs.length ? price(s, UPGRADES[id].costs[s.up[id]]) : null);
   const nextJob = (s) => (s.job + 1 < JOBS.length ? JOBS[s.job + 1] : null);
-  function costOf(s, kind) {
+  /* Покупки вкладки «Покупки», на которые действует скидка за рекламу (должность бесплатная, колода в своей вкладке) */
+  const onSale = (kind) => kind === 'gym' || kind === 'home' || kind === 'asset' || kind === 'reel' || (typeof kind === 'string' && kind.slice(0, 3) === 'up:');
+  function listCost(s, kind) {
     switch (kind) {
       case 'gym': return s.health >= 100 ? null : gymCost(s);
       case 'home': return homeCost(s);
       case 'asset': return assetCost(s);
       case 'reel': return reelCost(s);
     }
+    if (typeof kind !== 'string') return null;
     if (kind.slice(0, 4) === 'add:') return addCost(s, kind.slice(4));
     if (kind.slice(0, 4) === 'cut:') return removeCost(s, kind.slice(4));
     if (kind.slice(0, 3) === 'up:') return upCost(s, kind.slice(3));
     return null;
+  }
+  /* Цена покупки с учётом скидки за рекламу. Ей пользуются и кнопки, и сама покупка. */
+  function costOf(s, kind) {
+    const c = listCost(s, kind);
+    return c != null && s.sale && onSale(kind) ? Math.round(c * (1 - SALE_CUT)) : c;
   }
 
   /* kind: job, gym, home, asset, reel, add:символ, cut:символ, up:улучшение */
@@ -2369,6 +2437,7 @@ const Core = (() => {
     const cost = costOf(s, kind);
     if (cost == null || s.money < cost) return false;
     s.money -= cost;
+    if (s.sale && onSale(kind)) { s.sale = false; s.saleAt = s.month + SALE_REST; }
     if (kind === 'gym') s.health = Math.min(100, s.health + 20);
     else if (kind === 'home') { s.home += 1; note(s, 'home', { i: s.home }); }
     else if (kind === 'asset') { s.assets += 1; s.deck.coin += 1; note(s, 'asset', { i: s.assets - 1 }); }
@@ -2463,6 +2532,7 @@ const Core = (() => {
 
   return {
     GOAL, START_AGE, END_AGE, YEAR, TOTAL, SYMBOLS, START_DECK, FOCI, BUYABLE, JOBS, HOMES, ASSETS,
+    AD_LIMIT, STAR_REST, SALE_CUT, SALE_REST, adsLeft, starReady, chargeStar, saleReady, startSale, onSale, traitMore, extraTrait,
     MILESTONES, PAY, CARD_BASE, CARD_GROW, BILL_REMOVE, SKILL_PCT, NET_PCT, NET_CAP, LUCK_CAP, FORK_IDS, SETS, WILD_COSTS, PERKS, PERK_IDS, WEALTH, BOOST_LEN, BOOST_REST,
     evaluate, normPerks, perkCost, lifePoints, retire, boostReady, startBoost, TRAITS, TRAIT_IDS, GOALS, CARD_NAME,
     CHARGE_MAX, LEVELED, XP_LEVELS, LEVEL_MULT, REEL4_COST, UPGRADES, UP_IDS, MULT_TABLES, CHARGE_NEED, INSURE_CUT, GOLD_LUCK,
@@ -2941,12 +3011,13 @@ const Art = (() => {
   let M = freshMeta();
 
   function validState(s) {
-    if (!s || s.v !== 7) return false;
+    if (!s || s.v !== 8) return false;
     if (!Array.isArray(s.story) || !s.story.every((e) => e && typeof e === 'object' && typeof e.m === 'number' && isFinite(e.m) && typeof e.k === 'string')) return false;
-    const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt'];
+    const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt', 'ads', 'starAt', 'saleAt'];
     const num = (v) => typeof v === 'number' && isFinite(v);
     if (!nums.every((k) => num(s[k]))) return false;
     if (!s.xp || !C.LEVELED.every((k) => num(s.xp[k])) || typeof s.reels4 !== 'boolean') return false;
+    if (typeof s.sale !== 'boolean' || typeof s.trait4 !== 'boolean' || s.ads < 0 || s.ads > C.AD_LIMIT) return false;
     if (!s.deck || !C.SYMBOLS.every((k) => num(s.deck[k]) && s.deck[k] >= C.MIN_CARDS[k])) return false;
     if (!s.bought || !C.BUYABLE.every((k) => num(s.bought[k]))) return false;
     if (!s.flags || typeof s.flags.debt !== 'boolean' || typeof s.flags.low !== 'boolean' || !num(s.flags.yes) || !num(s.flags.gold)) return false;
@@ -3437,7 +3508,7 @@ const Art = (() => {
     if (f.gold) {
       g.children[0].textContent = ownsNoAds() ? 'Золотой: без рекламы' : 'Золотой: за рекламу';
       g.children[1].textContent = f.gold.label;
-      g.children[2].textContent = f.gold.enabled ? f.gold.note : 'Не хватает денег';
+      g.children[2].textContent = f.gold.limit ? 'Лимит бонусов на эту жизнь исчерпан' : f.gold.enabled ? f.gold.note : 'Не хватает денег';
       g.disabled = !f.gold.enabled;
     }
     $('forkLay').hidden = false;
@@ -3474,7 +3545,7 @@ const Art = (() => {
     if (!adOpen) return;
     stopAd();
     openedAt = Date.now();
-    if (forkOpen) $('forkBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
+    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
   }
   /* Купленное «Без рекламы» отдаёт тот же бонус сразу, без ролика: суммы и ограничения не меняются */
   function ownsNoAds() { return C.noAds(M.owned); }
@@ -3568,8 +3639,32 @@ const Art = (() => {
       render(); save(); schedule(300);
     });
   }
+  function useStar(li) {
+    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    withAd(() => {
+      if (!C.chargeStar(S)) { schedule(); return; }
+      sfx.big();
+      pushLog('Звезда заряжена: «Свой месяц» готов', null, 'star');
+      floatLabel('Звезда заряжена', '');
+      pulse(li, 'flash');
+      render(); save(); schedule(300);
+    });
+  }
+  function useSale(li) {
+    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    withAd(() => {
+      if (!C.startSale(S)) { schedule(); return; }
+      sfx.big();
+      pushLog(`Скидка ${Math.round(C.SALE_CUT * 100)}% на следующую покупку`, null, 'star');
+      floatLabel(`Скидка −${Math.round(C.SALE_CUT * 100)}%`, '');
+      pulse(li, 'flash');
+      render(); save(); schedule(300);
+    });
+  }
   function buy(kind, li) {
     if (kind === 'boost') { useBoost(li); return; }
+    if (kind === 'ad-star') { useStar(li); return; }
+    if (kind === 'ad-sale') { useSale(li); return; }
     const before = S.money, prev = { job: S.job, home: S.home };
     if (!C.act(S, kind)) return;
     sfx.buy();
@@ -3603,8 +3698,9 @@ const Art = (() => {
 
   /* ---------- Отрисовка состояния ---------- */
   const shopRows = {}, deckRows = {};
-  const rowOf = (li) => ({ li, h: li.querySelector('h3'), p: li.querySelector('p'), b: li.querySelector('.btn-buy'), hint: li.querySelector('small'), max: li.querySelector('.max-btn'), was: false });
-  const SHOP_ICON = { boost: 'star', job: 'work', gym: 'gym', home: 'home', asset: 'asset', reel: 'reel', 'up-mult': 'mult', 'up-star': 'star', 'up-insure': 'finlit', 'up-coach': 'coach' };
+  const AD_ROWS = ['boost', 'ad-star', 'ad-sale'];
+  const rowOf = (li) => ({ li, act: li.querySelector('.shop-act'), h: li.querySelector('h3'), p: li.querySelector('p'), b: li.querySelector('.btn-buy'), hint: li.querySelector('small'), max: li.querySelector('.max-btn'), was: false });
+  const SHOP_ICON = { boost: 'star', 'ad-star': 'star', 'ad-sale': 'finlit', job: 'work', gym: 'gym', home: 'home', asset: 'asset', reel: 'reel', 'up-mult': 'mult', 'up-star': 'star', 'up-insure': 'finlit', 'up-coach': 'coach' };
   document.querySelectorAll('#shop li').forEach((li) => {
     li.querySelector('img').src = ICON[SHOP_ICON[li.dataset.kind]];
     shopRows[li.dataset.kind] = rowOf(li);
@@ -3621,6 +3717,9 @@ const Art = (() => {
     if (verb.textContent !== o.verb) verb.textContent = o.verb || '';
     if (price.textContent !== (o.price || '')) price.textContent = o.price || '';
     r.b.disabled = !o.enabled;
+    /* метка скидки лежит поверх угла кнопки и ничего не сдвигает */
+    const tag = o.sale || '';
+    if ((r.act.dataset.sale || '') !== tag) { if (tag) r.act.dataset.sale = tag; else delete r.act.dataset.sale; }
     r.b.style.setProperty('--p', Math.round(Math.max(0, Math.min(1, o.progress || 0)) * 100) + '%');
     r.li.classList.toggle('can', !!o.enabled);
     if (r.max) {
@@ -3634,25 +3733,40 @@ const Art = (() => {
   }
 
   /* Кнопка с ценой: доступность, полоска накопления и «через сколько» */
-  function payer() {
+  /* mark: цены вкладки «Покупки», на них действует скидка за рекламу (метка на кнопке, цена уже со скидкой) */
+  function payer(mark) {
     const s = S, open = s.status === 'playing' && !s.fork && !s.traitOptions, ev = C.expected(s);
     return (cost) => {
       const ok = open && cost != null && s.money >= cost;
       const wait = cost != null && s.money < cost && ev > 0 ? Math.ceil((cost - s.money) / ev) : null;
-      return { price: money(cost), enabled: ok, progress: cost ? s.money / cost : 0, hint: wait != null && wait <= 600 ? `через ${span(wait)}` : (s.money < 0 ? 'сначала закрой долг' : '') };
+      return { price: money(cost), sale: mark && s.sale && cost != null ? `−${Math.round(C.SALE_CUT * 100)}%` : '', enabled: ok, progress: cost ? s.money / cost : 0, hint: wait != null && wait <= 600 ? `через ${span(wait)}` : (s.money < 0 ? 'сначала закрой долг' : '') };
     };
   }
 
   function renderShop() {
     const s = S;
     const open = s.status === 'playing' && !s.fork && !s.traitOptions;
-    const pay = payer();
+    const pay = payer(true);
 
+    /* Бонусы за рекламу: строки всегда на месте, недоступный бонус честно подписан на кнопке */
+    const head = `Бонусы · ${s.ads} из ${C.AD_LIMIT}`;
+    if ($('adsHead').textContent !== head) $('adsHead').textContent = head;
+    const capped = C.adsLeft(s) === 0;
+    const watch = { verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true };
+    const limit = { verb: 'Лимит', price: 'на жизнь', done: true, progress: 0 };
+    const rest = (at, len) => ({ verb: 'Отдых', price: open ? `ещё ${Math.max(0, at - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, at - s.month) / len : 0 });
     setRow(shopRows.boost, s.boost > 0
       ? { title: 'Удачный год идёт', desc: 'Зарплата, пассив и деньги хороших событий вдвое.', verb: 'Идёт', price: `ещё ${s.boost} мес.`, done: true, progress: 1 }
-      : C.boostReady(s)
-        ? { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true }
-        : { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: 'Отдых', price: open ? `ещё ${Math.max(0, s.boostAt - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, s.boostAt - s.month) / C.BOOST_REST : 0 });
+      : Object.assign({ title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое` }, C.boostReady(s) ? watch : capped ? limit : rest(s.boostAt, C.BOOST_REST)));
+    setRow(shopRows['ad-star'], Object.assign({ title: 'Зарядить звезду', desc: '«Свой месяц» готов сразу, без пустых месяцев' }, C.starReady(s) ? watch
+      : capped ? limit
+      : s.charge >= C.chargeMax(s) ? { verb: 'Заряжена', price: 'уже', done: true, progress: 1 }
+      : rest(s.starAt, C.STAR_REST)));
+    const cut = Math.round(C.SALE_CUT * 100);
+    setRow(shopRows['ad-sale'], s.sale
+      ? { title: `Скидка ${cut}% включена`, desc: 'Цены ниже уже со скидкой. Она уйдёт только с покупкой', verb: 'Ждёт', price: 'покупки', done: true, progress: 1 }
+      : Object.assign({ title: `Скидка ${cut}%`, desc: 'Следующая покупка в этой вкладке дешевле. Должность и так бесплатная' },
+        C.saleReady(s) ? watch : capped ? limit : rest(s.saleAt, C.SALE_REST)));
 
     const nj = C.nextJob(s);
     if (nj) {
@@ -3671,13 +3785,13 @@ const Art = (() => {
     const less = hf === 0 ? ' <span class="warn">Зарплаты нет: здоровье на нуле.</span>' : hf < 1 ? ` <span class="warn">Зарплата урезана на ${Math.round((1 - hf) * 100)}%.</span>` : '';
     setRow(shopRows.gym, full
       ? { title: 'Спортзал', desc: 'Здоровье полное, качаться незачем.', verb: 'Здоров', price: '100 из 100', enabled: false, done: true, progress: 0 }
-      : Object.assign({ title: 'Спортзал', desc: '+20 здоровья.' + less, verb: 'Сходить' }, pay(C.gymCost(s))));
+      : Object.assign({ title: 'Спортзал', desc: '+20 здоровья.' + less, verb: 'Сходить' }, pay(C.costOf(s, 'gym'))));
 
-    const hc = C.homeCost(s);
+    const hc = C.costOf(s, 'home');
     if (hc != null) setRow(shopRows.home, Object.assign({ title: C.HOMES[s.home + 1].name, desc: '+6% к зарплате, здоровье тратится медленнее', verb: 'Переехать' }, pay(hc)));
     else setRow(shopRows.home, { title: 'Вилла у моря', desc: 'Жильё: лучше уже некуда.', verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
 
-    const ac = C.assetCost(s);
+    const ac = C.costOf(s, 'asset');
     if (ac != null) {
       const inc = C.assetIncome(s, s.assets);
       const late = Math.ceil(ac / inc) > C.monthsLeft(s);
@@ -3688,7 +3802,7 @@ const Art = (() => {
       }, pay(ac)));
     } else setRow(shopRows.asset, { title: 'Все инвестиции', desc: `Портфель приносит ${money(C.passive(s))} в месяц.`, verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
 
-    if (!s.reels4) setRow(shopRows.reel, Object.assign({ title: 'Четвёртый барабан', desc: 'Больше совпадений: две пары сразу и каре', verb: 'Поставить' }, pay(C.reelCost(s))));
+    if (!s.reels4) setRow(shopRows.reel, Object.assign({ title: 'Четвёртый барабан', desc: 'Больше совпадений: две пары сразу и каре', verb: 'Поставить' }, pay(C.costOf(s, 'reel'))));
     else setRow(shopRows.reel, { title: 'Четвёртый барабан', desc: `Стоит. Событие дают ${pf.format(C.odds(s).any * 100)}% спинов.`, verb: 'Куплено', price: 'стоит', done: true, progress: 1 });
 
     /* улучшения слота: уровни по порядку, шансы множителя видны до покупки */
@@ -3700,13 +3814,14 @@ const Art = (() => {
       coach: (lvl, max) => (lvl < max ? 'Символы получают вдвое больше опыта и быстрее растут в уровне.' : 'Символы получают вдвое больше опыта.'),
     };
     C.UP_IDS.forEach((id) => {
-      const lvl = s.up[id], max = C.UPGRADES[id].costs.length, cost = C.upCost(s, id);
+      const lvl = s.up[id], max = C.UPGRADES[id].costs.length, cost = C.costOf(s, 'up:' + id);
       const title = C.UPGRADES[id].name + (max > 1 && lvl ? `, уровень ${lvl} из ${max}` : '');
       if (cost != null) setRow(shopRows['up-' + id], Object.assign({ title, desc: UP_TEXT[id](lvl, max), verb: lvl ? 'Улучшить' : 'Купить' }, pay(cost)));
       else setRow(shopRows['up-' + id], { title, desc: UP_TEXT[id](lvl, max), verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
     });
 
-    const ready = Object.keys(shopRows).filter((k) => !shopRows[k].b.disabled).length;
+    /* на значке только покупки: бонусы за рекламу о себе не напоминают */
+    const ready = Object.keys(shopRows).filter((k) => !AD_ROWS.includes(k) && !shopRows[k].b.disabled).length;
     const badge = $('shopBadge');
     badge.dataset.empty = ready === 0 ? '1' : '0';
     badge.textContent = ready || '0';
@@ -4095,11 +4210,30 @@ const Art = (() => {
     clearTimeout(timer);
     $('traitIcon').src = ICON.star;
     $('traitKind').textContent = `Жизнь ${S.life}: новая попытка`;
-    $('traitOpts').innerHTML = S.traitOptions.map((id) =>
-      `<button class="opt" type="button" data-trait="${id}"><img src="${ICON[TRAIT_ICON[id]]}" alt=""><b>${esc(C.TRAITS[id].name)}</b><span>${esc(C.TRAITS[id].note)}</span></button>`).join('');
+    renderTraits();
     $('traitLay').hidden = false;
     openedAt = Date.now();
     $('traitBox').focus();
+  }
+  function renderTraits() {
+    $('traitOpts').innerHTML = S.traitOptions.map((id) =>
+      `<button class="opt" type="button" data-trait="${id}"><img src="${ICON[TRAIT_ICON[id]]}" alt=""><b>${esc(C.TRAITS[id].name)}</b><span>${esc(C.TRAITS[id].note)}</span></button>`).join('');
+    /* «Четвёртая черта»: раз за жизнь; после неё или когда показывать нечего, кнопки нет */
+    const more = $('traitMore');
+    more.hidden = S.trait4 || !C.TRAIT_IDS.some((id) => !S.traitOptions.includes(id));
+    more.disabled = !C.traitMore(S);
+    more.firstElementChild.textContent = ownsNoAds() ? 'Без рекламы' : 'За рекламу';
+    more.lastElementChild.textContent = more.disabled ? 'Лимит бонусов на эту жизнь исчерпан' : 'Ещё один вариант из тех же черт. Один раз за жизнь';
+  }
+  function moreTrait() {
+    if (!traitOpen || adOpen || !C.traitMore(S) || Date.now() - openedAt < GUARD) return;
+    withAd(() => {
+      if (!traitOpen || !C.extraTrait(S)) return;
+      renderTraits();
+      openedAt = Date.now();
+      save();
+      $('traitBox').focus();
+    });
   }
   function chooseTrait(id) {
     if (!traitOpen || Date.now() - openedAt < GUARD) return;
@@ -4188,6 +4322,7 @@ const Art = (() => {
     buy((b.classList.contains('max-btn') || sym === 'bill' ? 'cut:' : 'add:') + sym, li);
   });
   $('traitOpts').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chooseTrait(b.dataset.trait); });
+  $('traitMore').addEventListener('click', moreTrait);
   $('modalBtn').addEventListener('click', () => closeModal(false));
   $('modalAlt').addEventListener('click', () => closeModal(true));
   $('nextBtn').addEventListener('click', () => { if (S.status !== 'playing' && !modalOpen) newLife(); });

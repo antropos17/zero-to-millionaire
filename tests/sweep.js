@@ -54,6 +54,10 @@ const file = 'file://' + path.resolve(process.argv[2]);
         /* иногда докупаем и убираем карту связей: так проверяется ссылка «убрать» */
         if (frames % 53 === 0 && !q('network').disabled) q('network').click();
         if (frames % 131 === 0) { const c = document.querySelector('li[data-kind="network"] .max-btn'); if (!c.hidden && !c.disabled) c.click(); }
+        /* бонусы за рекламу без ролика: так проверяются все состояния строк раздела «Бонусы», включая лимит */
+        if (frames % 29 === 0) Core.startBoost(S);
+        if (frames % 37 === 0) Core.startSale(S);
+        if (frames % 41 === 0) Core.chargeStar(S);
         /* звезда тратится сразу: так проверяются её состояния и уровни символов */
         if (Core.canCharge(S)) Core.spin(S, Math.random, { charged: S.focus });
         window.z2m.skip(1);

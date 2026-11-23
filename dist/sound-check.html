@@ -65,6 +65,13 @@ const Core = (() => {
   SETS.forEach((t) => { SET_BY[t.id] = t; });
   /* «Удачный год» за рекламу: столько месяцев все доходы вдвое, потом столько же месяцев отдыха */
   const BOOST_LEN = 12, BOOST_REST = 24;
+  /* Рекламные бонусы: не больше AD_LIMIT за жизнь. В счёт идут золотые варианты, «Удачный год»,
+     заряд звезды, скидка и четвёртая черта. Удвоение за время отсутствия в счёт не идёт. */
+  const AD_LIMIT = 16;
+  /* «Зарядить звезду»: «Свой месяц» готов сразу, потом столько месяцев отдыха */
+  const STAR_REST = 24;
+  /* «Скидка»: следующая покупка во вкладке «Покупки» дешевле на SALE_CUT, после неё столько месяцев отдыха */
+  const SALE_CUT = 0.2, SALE_REST = 24;
   /* Наследие: постоянные улучшения за опыт прошлых жизней. Действуют с начала следующей жизни. */
   const PERKS = {
     cash: { name: 'Семейный капитал', costs: [1, 2, 3, 4], vals: [0, 500, 2000, 6000, 15000] },
@@ -182,13 +189,14 @@ const Core = (() => {
   function newState(perks, life, rng) {
     const P = normPerks(perks), start = PERKS.cash.vals[P.cash];
     const s = {
-      v: 7,
+      v: 8,
       money: start, month: 0, job: 0, skill: 0, health: 100, network: PERKS.ties.vals[P.ties],
       home: 0, assets: 0,
       deck: Object.assign({}, START_DECK, { study: START_DECK.study + P.school, wild: P.joker }),
       bought: { study: 0, health: 0, network: 0, chance: 0, wild: 0 }, billsCut: 0, cut: 0,
       charge: P.star ? CHARGE_NEED[0] : 0, xp: { work: 0, study: 0, health: 0, network: 0 }, reels4: false,
       up: { mult: 0, star: 0, insure: 0, coach: 0 }, boost: 0, boostAt: 0,
+      ads: 0, starAt: 0, saleAt: 0, sale: false, trait4: false,
       focus: 'work', fork: null, lastForks: [], ms: 0,
       trait: null, traitOptions: null,
       flags: { debt: false, low: false, yes: 0, gold: 0, sets: [], quad: false },
@@ -211,6 +219,17 @@ const Core = (() => {
     s.trait = id;
     s.traitOptions = null;
     if (TRAITS[id].apply) TRAITS[id].apply(s);
+    return true;
+  }
+
+  /* «Четвёртая черта» за рекламу: ещё один вариант из тех черт, что не показаны. Раз за жизнь. */
+  const traitMore = (s) => !!s.traitOptions && !s.trait4 && s.ads < AD_LIMIT && TRAIT_IDS.some((id) => !s.traitOptions.includes(id));
+  function extraTrait(s, rng) {
+    if (!traitMore(s)) return false;
+    rng = rng || Math.random;
+    const pool = TRAIT_IDS.filter((id) => !s.traitOptions.includes(id));
+    s.traitOptions.push(pool[Math.floor(rng() * pool.length)]);
+    s.trait4 = true; s.ads += 1;
     return true;
   }
 
@@ -240,6 +259,12 @@ const Core = (() => {
       delete s.legacy;
     }
     if (s && s.v === 6) { s.v = 7; s.story = []; }
+    /* до v8 лимита не было: в счёт идут золотые варианты, которые уже взяты, остальное отсчитывается заново */
+    if (s && s.v === 7) {
+      s.v = 8;
+      s.ads = Math.min(AD_LIMIT, (s.flags && s.flags.gold) | 0);
+      s.starAt = 0; s.saleAt = 0; s.sale = false; s.trait4 = false;
+    }
     return s;
   }
 
@@ -1008,7 +1033,9 @@ const Core = (() => {
     if (!s.fork) return null;
     const f = FORKS[s.fork].make(s), g = goldOption(s, s.fork);
     const opt = (o) => ({ label: o.label, note: o.note, enabled: o.cost == null || s.money >= o.cost });
-    return { id: s.fork, title: f.title, text: f.text, options: [opt(f.a), opt(f.b)], gold: g ? opt(g) : null };
+    const gold = g ? opt(g) : null;
+    if (gold && s.ads >= AD_LIMIT) { gold.enabled = false; gold.limit = true; }
+    return { id: s.fork, title: f.title, text: f.text, options: [opt(f.a), opt(f.b)], gold };
   }
 
   /* Летопись: главные события жизни, из них в конце собирается эпитафия */
@@ -1030,8 +1057,8 @@ const Core = (() => {
     const id = s.fork, f = FORKS[id].make(s);
     const isGold = idx === 'gold';
     const o = isGold ? goldOption(s, id) : idx === 0 ? f.a : f.b;
-    if (!o || (o.cost != null && s.money < o.cost)) return null;
-    if (isGold) s._gold = true;
+    if (!o || (o.cost != null && s.money < o.cost) || (isGold && s.ads >= AD_LIMIT)) return null;
+    if (isGold) { s._gold = true; s.ads += 1; }
     const before = s.money, h0 = s.health, sk = s.skill, nw = s.network, job0 = s.job, home0 = s.home, as0 = s.assets;
     const d0 = Object.assign({}, s.deck);
     let out;
@@ -1190,11 +1217,35 @@ const Core = (() => {
     s.status = 'won'; s.fork = null;
     return true;
   }
-  const boostReady = (s) => s.status === 'playing' && !s.fork && !s.traitOptions && s.boost === 0 && s.month >= s.boostAt;
+  /* ---------- Рекламные бонусы ---------- */
+  /* ready: кнопку можно нажать сейчас. Сам бонус выдаётся и тогда, когда за время ролика открылась развилка:
+     досмотренная реклама всегда даёт обещанное. */
+  const adsLeft = (s) => Math.max(0, AD_LIMIT - s.ads);
+  const adOpen = (s) => s.status === 'playing' && !s.fork && !s.traitOptions;
+  const boostCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.boost === 0 && s.month >= s.boostAt;
+  const boostReady = (s) => adOpen(s) && boostCan(s);
   function startBoost(s) {
-    if (s.status !== 'playing' || s.boost > 0 || s.month < s.boostAt) return false;
+    if (!boostCan(s)) return false;
     s.boost = BOOST_LEN;
     s.boostAt = s.month + BOOST_LEN + BOOST_REST;
+    s.ads += 1;
+    return true;
+  }
+  const starCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && s.month >= s.starAt && s.charge < chargeMax(s);
+  const starReady = (s) => adOpen(s) && starCan(s);
+  function chargeStar(s) {
+    if (!starCan(s)) return false;
+    s.charge = chargeMax(s);
+    s.starAt = s.month + STAR_REST;
+    s.ads += 1;
+    return true;
+  }
+  const saleCan = (s) => s.status === 'playing' && s.ads < AD_LIMIT && !s.sale && s.month >= s.saleAt;
+  const saleReady = (s) => adOpen(s) && saleCan(s);
+  function startSale(s) {
+    if (!saleCan(s)) return false;
+    s.sale = true;
+    s.ads += 1;
     return true;
   }
 
@@ -1205,17 +1256,25 @@ const Core = (() => {
   const reelCost = (s) => (s.reels4 ? null : price(s, REEL4_COST));
   const upCost = (s, id) => (UPGRADES[id] && s.up[id] < UPGRADES[id].costs.length ? price(s, UPGRADES[id].costs[s.up[id]]) : null);
   const nextJob = (s) => (s.job + 1 < JOBS.length ? JOBS[s.job + 1] : null);
-  function costOf(s, kind) {
+  /* Покупки вкладки «Покупки», на которые действует скидка за рекламу (должность бесплатная, колода в своей вкладке) */
+  const onSale = (kind) => kind === 'gym' || kind === 'home' || kind === 'asset' || kind === 'reel' || (typeof kind === 'string' && kind.slice(0, 3) === 'up:');
+  function listCost(s, kind) {
     switch (kind) {
       case 'gym': return s.health >= 100 ? null : gymCost(s);
       case 'home': return homeCost(s);
       case 'asset': return assetCost(s);
       case 'reel': return reelCost(s);
     }
+    if (typeof kind !== 'string') return null;
     if (kind.slice(0, 4) === 'add:') return addCost(s, kind.slice(4));
     if (kind.slice(0, 4) === 'cut:') return removeCost(s, kind.slice(4));
     if (kind.slice(0, 3) === 'up:') return upCost(s, kind.slice(3));
     return null;
+  }
+  /* Цена покупки с учётом скидки за рекламу. Ей пользуются и кнопки, и сама покупка. */
+  function costOf(s, kind) {
+    const c = listCost(s, kind);
+    return c != null && s.sale && onSale(kind) ? Math.round(c * (1 - SALE_CUT)) : c;
   }
 
   /* kind: job, gym, home, asset, reel, add:символ, cut:символ, up:улучшение */
@@ -1232,6 +1291,7 @@ const Core = (() => {
     const cost = costOf(s, kind);
     if (cost == null || s.money < cost) return false;
     s.money -= cost;
+    if (s.sale && onSale(kind)) { s.sale = false; s.saleAt = s.month + SALE_REST; }
     if (kind === 'gym') s.health = Math.min(100, s.health + 20);
     else if (kind === 'home') { s.home += 1; note(s, 'home', { i: s.home }); }
     else if (kind === 'asset') { s.assets += 1; s.deck.coin += 1; note(s, 'asset', { i: s.assets - 1 }); }
@@ -1326,6 +1386,7 @@ const Core = (() => {
 
   return {
     GOAL, START_AGE, END_AGE, YEAR, TOTAL, SYMBOLS, START_DECK, FOCI, BUYABLE, JOBS, HOMES, ASSETS,
+    AD_LIMIT, STAR_REST, SALE_CUT, SALE_REST, adsLeft, starReady, chargeStar, saleReady, startSale, onSale, traitMore, extraTrait,
     MILESTONES, PAY, CARD_BASE, CARD_GROW, BILL_REMOVE, SKILL_PCT, NET_PCT, NET_CAP, LUCK_CAP, FORK_IDS, SETS, WILD_COSTS, PERKS, PERK_IDS, WEALTH, BOOST_LEN, BOOST_REST,
     evaluate, normPerks, perkCost, lifePoints, retire, boostReady, startBoost, TRAITS, TRAIT_IDS, GOALS, CARD_NAME,
     CHARGE_MAX, LEVELED, XP_LEVELS, LEVEL_MULT, REEL4_COST, UPGRADES, UP_IDS, MULT_TABLES, CHARGE_NEED, INSURE_CUT, GOLD_LUCK,

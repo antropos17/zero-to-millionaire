@@ -147,7 +147,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await set(p, { money: 99999 });
   ok('значок на вкладке считает доступные покупки', Number(await p.textContent('#shopBadge')) >= 3, await p.textContent('#shopBadge'));
   const groups = await p.evaluate(() => Array.from(document.querySelectorAll('#shop > h3.sub')).map((h) => h.textContent + ':' + Array.from(h.nextElementSibling.querySelectorAll('li')).map((li) => li.dataset.kind).join(',')).join(' | '));
-  ok('покупки разложены по разделам в нужном порядке', groups === 'Бонусы:boost | Жизнь:job,gym,home | Капитал:asset | Слот:reel,up-mult,up-star,up-insure,up-coach', groups);
+  ok('покупки разложены по разделам в нужном порядке', groups === 'Бонусы · 0 из 16:boost,ad-star,ad-sale | Жизнь:job,gym,home | Капитал:asset | Слот:reel,up-mult,up-star,up-insure,up-coach', groups);
   /* пара монет платит пассивный доход за 6 месяцев: работа до .4, учёба .5, здоровье .6, связи .667, шанс .767, монета .867 */
   await fix(p, { money: 100, assets: 1, deck: Object.assign({}, D0, { coin: 3 }) });
   const c0 = await p.evaluate(() => { const s = window.z2m.state(); return { money: s.money, sal: Core.salary(s), pas: Core.passive(s) }; });
@@ -476,7 +476,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, KEY);
   await p.reload(); await enter(p);
   s = await st(p);
-  ok('старое сохранение продолжилось с колодой', s.v === 7 && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
+  ok('старое сохранение продолжилось с колодой', s.v === 8 && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
   await p.close();
 
   /* 10. Хранилище запрещено */
@@ -641,6 +641,81 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.waitForSelector('#menuNew', { state: 'visible' });
   await p.click('#menuNew'); await p.click('#menuNew'); await p.waitForTimeout(300);
   ok('«Новая игра» стирает жизнь, но не покупки и тему', (await st(p)).life === 1 && (await owned(p)).length === 4 && (await meta(p)).theme === 'dusk' && (await theme(p)) === 'dusk');
+  await p.close();
+
+  /* 11. Бонусы за рекламу: звезда, скидка, лимит на жизнь, четвёртая черта, честные подписи */
+  p = await mk();
+  await p.evaluate(() => { if (document.getElementById('autoBtn').getAttribute('aria-pressed') === 'true') document.getElementById('autoBtn').click(); window.z2m.adMs = 250; });
+  await p.click('#tabBtn-shop');
+  const adRow = (k) => p.locator(`li[data-kind="${k}"]`);
+  const rowsText = () => p.evaluate(() => ['boost', 'ad-star', 'ad-sale'].map((k) => { const li = document.querySelector(`li[data-kind="${k}"]`); return { k, title: li.querySelector('h3').textContent, desc: li.querySelector('p').textContent, btn: li.querySelector('.btn-buy').textContent, off: li.querySelector('.btn-buy').disabled, shown: li.offsetHeight > 0 }; }));
+  await fix(p, { money: 50000, charge: 0, starAt: 0, saleAt: 0, sale: false, ads: 0, boost: 0, boostAt: 0, health: 60 });
+  let rt = await rowsText();
+  ok('в разделе «Бонусы» три строки, у каждой сказано, что даётся, на кнопке — что нужно сделать', rt.length === 3 && rt.every((r) => r.shown && r.title && r.desc.length > 20 && /Смотреть\s*рекламу/.test(r.btn) && !r.off) && /Свой месяц/.test(rt[1].desc) && /дешевле/.test(rt[2].desc) && (await p.textContent('#adsHead')) === 'Бонусы · 0 из 16', JSON.stringify(rt));
+  await p.waitForTimeout(400);
+  await adRow('ad-star').locator('.btn-buy').click();
+  const starAd = await p.locator('#adLay').isVisible() && (await st(p)).charge === 0;
+  await p.waitForTimeout(600);
+  s = await st(p);
+  ok('«Зарядить звезду»: после ролика звезда заряжена, бонус посчитан, 24 месяца отдыха', starAd && s.charge === (await p.evaluate(() => Core.chargeMax(window.z2m.state()))) && s.ads === 1 && s.starAt === s.month + 24 && (await p.textContent('#adsHead')) === 'Бонусы · 1 из 16' && await adRow('ad-star').locator('.btn-buy').isDisabled() && /Заряжена/.test(await adRow('ad-star').locator('.btn-buy').textContent()), JSON.stringify({ charge: s.charge, ads: s.ads, starAt: s.starAt }));
+  await set(p, { charge: 0 });
+  ok('после звезды строка на месте и честно говорит, сколько ждать', /Отдых\s*ещё 24 мес\./.test(await adRow('ad-star').locator('.btn-buy').textContent()));
+  const list0 = await p.evaluate(() => { const t = JSON.parse(JSON.stringify(window.z2m.state())); return { home: Core.costOf(t, 'home'), gym: Core.costOf(t, 'gym'), job: Core.costOf(t, 'job') }; });
+  await adRow('ad-sale').locator('.btn-buy').click();
+  await p.waitForTimeout(600);
+  s = await st(p);
+  const saleView = await p.evaluate(() => { const s = window.z2m.state(); const txt = (k) => (document.querySelector(`li[data-kind="${k}"] .shop-act`).dataset.sale || '') + ' ' + document.querySelector(`li[data-kind="${k}"] .btn-buy span`).textContent; return { home: Core.costOf(s, 'home'), gym: Core.costOf(s, 'gym'), card: Core.costOf(s, 'add:study'), cardList: Core.addCost(s, 'study'), th: txt('home'), tg: txt('gym'), tr: txt('reel'), tj: txt('job') }; });
+  const dollars = (t) => Number(t.replace(/^−20% /, '').replace(/[^0-9]/g, ''));
+  const deckTag = () => p.evaluate(() => Array.from(document.querySelectorAll('#deck .shop-act')).some((a) => a.dataset.sale));
+  ok('«Скидка»: цены всех покупок вкладки ниже на 20% и видны на кнопках, колода и должность без скидки', s.sale === true && s.ads === 2 && saleView.home === Math.round(list0.home * 0.8) && saleView.gym === Math.round(list0.gym * 0.8) && /^−20% /.test(saleView.th) && /^−20% /.test(saleView.tg) && /^−20% /.test(saleView.tr) && dollars(saleView.th) === saleView.home && saleView.card === saleView.cardList && !/20%/.test(saleView.tj) && !(await deckTag()), JSON.stringify(saleView));
+  await set(p, { skill: 20 });
+  await p.locator('li[data-kind="job"] .btn-buy').click();
+  ok('повышение скидку не тратит', (await st(p)).sale === true && (await st(p)).job === 1);
+  const sm0 = (await st(p)).money, hc = await p.evaluate(() => Core.costOf(window.z2m.state(), 'home'));
+  await p.locator('li[data-kind="home"] .btn-buy').click();
+  s = await st(p);
+  ok('покупка со скидкой: списана цена с кнопки, скидка ушла, 24 месяца отдыха', s.money === sm0 - hc && s.sale === false && s.saleAt === s.month + 24 && !(await p.evaluate(() => document.querySelector('li[data-kind="gym"] .shop-act').dataset.sale)) && /Отдых/.test(await adRow('ad-sale').locator('.btn-buy').textContent()), JSON.stringify({ d: sm0 - s.money, hc, sale: s.sale }));
+  /* лимит: 16 бонусов за жизнь, строки не пропадают, обычные варианты работают */
+  await fix(p, { money: 50000, charge: 0, starAt: 0, saleAt: 0, sale: false, ads: 16, boost: 0, boostAt: 0, health: 60 });
+  rt = await rowsText();
+  ok('лимит исчерпан: все три бонуса выключены и подписаны «лимит на жизнь», строки на месте', rt.every((r) => r.shown && r.off && /Лимит\s*на жизнь/.test(r.btn)) && (await p.textContent('#adsHead')) === 'Бонусы · 16 из 16', JSON.stringify(rt));
+  await p.evaluate(() => { const s = window.z2m.state(); s.fork = 'overtime'; window.z2m.refresh(); });
+  await p.reload(); await enter(p);
+  await p.evaluate(() => { window.z2m.adMs = 250; });
+  await p.waitForTimeout(450);
+  ok('лимит исчерпан: золотой вариант выключен с той же причиной, обычный и отказ доступны', await p.locator('#forkG').isVisible() && await p.locator('#forkG').isDisabled() && /Лимит бонусов на эту жизнь/.test(await p.textContent('#forkG')) && await p.locator('#forkA').isEnabled() && await p.locator('#forkB').isEnabled());
+  await p.click('#forkA');
+  ok('обычный вариант при исчерпанном лимите применяется как всегда', (await st(p)).fork === null && (await st(p)).ads === 16 && (await st(p)).flags.gold === 0);
+  ok('нет мигания и напоминалок: бонусы не считаются на значке вкладки', await p.evaluate(() => { const b = document.getElementById('shopBadge'); const n = Array.from(document.querySelectorAll('#shop li')).filter((li) => !['boost', 'ad-star', 'ad-sale'].includes(li.dataset.kind) && !li.querySelector('.btn-buy').disabled).length; return Number(b.textContent) === n; }));
+  /* проигрыш: на экране ни одного бонуса; новая жизнь: счётчик с нуля */
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.ads = 7; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  const loseTxt = await p.textContent('#modalBox');
+  ok('экран проигрыша: ни одного бонуса за рекламу, кнопки бонусов выключены', (await p.textContent('#modalTitle')) === '65 лет. Время вышло' && !/реклам|Удачный год|звезд|Скидк|черт|бонус/i.test(loseTxt) && (await rowsText()).every((r) => r.off && !/Смотреть/.test(r.btn)), loseTxt);
+  await p.waitForTimeout(450); await p.click('#modalBtn');
+  s = await st(p);
+  ok('новая жизнь: счётчик бонусов сброшен, отдых и скидка тоже', s.life === 2 && s.ads === 0 && s.sale === false && s.starAt === 0 && s.saleAt === 0 && s.trait4 === false && (await p.textContent('#adsHead')) === 'Бонусы · 0 из 16');
+  ok('в окне черты есть «Показать ещё одну черту» с подписью, что даётся', await p.locator('#traitMore').isVisible() && await p.locator('#traitMore').isEnabled() && /Показать ещё одну черту/.test(await p.textContent('#traitMore')) && /за рекламу/i.test(await p.textContent('#traitMore')) && /Один раз за жизнь/.test(await p.textContent('#traitMore')) && (await p.locator('#traitOpts .opt').count()) === 3);
+  const tr0 = (await st(p)).traitOptions;
+  await p.waitForTimeout(450);
+  await p.click('#traitMore');
+  const trAd = await p.locator('#adLay').isVisible();
+  await p.waitForTimeout(600);
+  s = await st(p);
+  ok('«Четвёртая черта»: после ролика четвёртый вариант из других черт, кнопка ушла, бонус посчитан', trAd && s.traitOptions.length === 4 && tr0.every((t) => s.traitOptions.includes(t)) && new Set(s.traitOptions).size === 4 && s.trait4 === true && s.ads === 1 && !(await p.locator('#traitMore').isVisible()) && (await p.locator('#traitOpts .opt').count()) === 4, JSON.stringify(s.traitOptions));
+  await p.waitForTimeout(450);
+  await p.click(`#traitOpts .opt[data-trait="${s.traitOptions[3]}"]`);
+  ok('четвёртую черту можно выбрать', (await st(p)).trait === s.traitOptions[3] && !(await p.locator('#traitLay').isVisible()));
+  /* отказ: черту выбирают сразу, одним нажатием, и больше ничего не предлагают */
+  await p.evaluate(() => { const t = window.z2m.state(); t.fork = null; t.money = 1000; t.peak = 1000; t.month = 47 * 12 - 1; window.z2m.skip(1); });
+  await p.waitForTimeout(300);
+  await p.waitForTimeout(450); await p.click('#modalBtn');
+  await p.waitForTimeout(450);
+  const pick1 = (await st(p)).traitOptions[0];
+  await p.click(`#traitOpts .opt[data-trait="${pick1}"]`);
+  await p.waitForTimeout(1200);
+  s = await st(p);
+  ok('отказ от четвёртой черты — одно нажатие, повторно не предлагается', s.trait === pick1 && s.trait4 === false && s.ads === 0 && !(await p.locator('#traitLay').isVisible()) && !(await p.locator('#adLay').isVisible()) && !(await p.locator('#overlay').isVisible()));
   await p.close();
 
   /* «Без рекламы» даёт ровно тот же бонус, только без ролика: одинаковая очередь случайных чисел, одинаковый итог */

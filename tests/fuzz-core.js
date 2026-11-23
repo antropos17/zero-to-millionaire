@@ -6,11 +6,14 @@ const note = (k, d) => { if (!bad[k]) { bad[k] = { n: 0, d }; } bad[k].n += 1; }
 const KINDS = ['job', 'gym', 'home', 'asset', 'reel', 'add:study', 'add:health', 'add:network', 'add:chance', 'add:wild', 'add:work', 'add:coin', 'add:bill', 'cut:study', 'cut:health', 'cut:network', 'cut:chance', 'cut:bill', 'cut:work', 'cut:coin', 'cut:wild', 'up:mult', 'up:star', 'up:insure', 'up:coach', 'up:nope', 'nope', ''];
 function check(s, where) {
   const fin = (v) => typeof v === 'number' && isFinite(v);
-  for (const k of ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'charge', 'boost', 'boostAt', 'ms', 'peak', 'earned']) if (!fin(s[k])) note('не число: ' + k, where);
+  for (const k of ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'charge', 'boost', 'boostAt', 'ms', 'peak', 'earned', 'ads', 'starAt', 'saleAt']) if (!fin(s[k])) note('не число: ' + k, where);
   if (s.health < 0 || s.health > 100) note('здоровье вне 0..100', where + ' ' + s.health);
   if (s.skill < 0 || s.network < 0) note('навык или связи ниже нуля', where);
   for (const k of Core.SYMBOLS) { if (!Number.isInteger(s.deck[k]) || s.deck[k] < Core.MIN_CARDS[k]) note('карты ниже минимума: ' + k, where + ' ' + s.deck[k]); }
   if (s.charge > Core.chargeMax(s) || s.charge < 0) note('заряд звезды вне границ', where);
+  if (!Number.isInteger(s.ads) || s.ads < 0 || s.ads > Core.AD_LIMIT) note('счётчик рекламы вне 0..лимита', where + ' ' + s.ads);
+  if (typeof s.sale !== 'boolean' || typeof s.trait4 !== 'boolean') note('флаги бонусов не логические', where);
+  if (s.traitOptions && new Set(s.traitOptions).size !== s.traitOptions.length) note('черты повторяются', where);
   if (s.month > Core.TOTAL) note('месяц больше конца жизни', where);
   if (s.status === 'playing' && s.month >= Core.TOTAL) note('жизнь не закончилась в 65', where);
   if (s.status !== 'playing' && s.fork) note('развилка после конца жизни', where);
@@ -27,6 +30,13 @@ function check(s, where) {
     if (!fin(Core.expected(s))) note('средний доход не число', where);
     if (!fin(Core.salary(s)) || !fin(Core.passive(s)) || Core.salary(s) < 0) note('зарплата или пассив сломаны', where);
     for (const kind of KINDS) { const c = Core.costOf(s, kind); if (c != null && (!fin(c) || c < 0)) note('цена сломана: ' + kind, where + ' ' + c); }
+    /* скидка за рекламу: только на покупки вкладки, не выше обычной цены и не ниже нуля */
+    const t = JSON.parse(JSON.stringify(s)); t.sale = !t.sale;
+    for (const kind of KINDS) {
+      const a = Core.costOf(s, kind), b = Core.costOf(t, kind), on = s.sale ? a : b, off = s.sale ? b : a;
+      if ((on == null) !== (off == null)) note('скидка меняет доступность: ' + kind, where);
+      else if (on != null && (on < 0 || on > off || (!Core.onSale(kind) && on !== off))) note('скидка считает не так: ' + kind, where + ` ${on}/${off}`);
+    }
   }
   const txt = JSON.stringify(s);
   if (/null/.test(JSON.stringify([s.money, s.health, s.skill]))) note('NaN в сохранении', where);
@@ -44,7 +54,7 @@ for (let i = 0; i < N; i++) {
   let guard = 0;
   while (s.status === 'playing' && guard++ < 5000) {
     try {
-      if (s.traitOptions) { if (rng() < 0.2) Core.pickTrait(s, 'nope'); if (rng() < 0.2) Core.spin(s, rng); Core.pickTrait(s, s.traitOptions[Math.floor(rng() * s.traitOptions.length)]); check(s, 'черта'); continue; }
+      if (s.traitOptions) { if (rng() < 0.4) { const n = s.traitOptions.length, had = s.trait4, a0 = s.ads; const ok = Core.extraTrait(s, rng); if (ok !== (!had && s.traitOptions.length === n + 1 && s.ads === a0 + 1)) note('четвёртая черта сработала не так', 'жизнь ' + s.life); if (Core.extraTrait(s, rng)) note('четвёртая черта дважды', ''); } if (rng() < 0.2) Core.pickTrait(s, 'nope'); if (rng() < 0.2) Core.spin(s, rng); Core.pickTrait(s, s.traitOptions[Math.floor(rng() * s.traitOptions.length)]); check(s, 'черта'); continue; }
       if (s.fork) {
         forks++;
         const f = Core.fork(s);
@@ -65,7 +75,13 @@ for (let i = 0; i < N; i++) {
       /* богатые жизни: так проверяются поздние состояния, все улучшения и миллионы */
       if (process.argv.includes('--rich') && rng() < 0.05) { s.money += Math.round(rng() * 400000); s.skill += Math.floor(rng() * 40); }
       if (rng() < 0.3) Core.setFocus(s, ['work', 'study', 'health', 'network', 'chance', 'nope'][Math.floor(rng() * 6)]);
+      /* бонусы за рекламу в случайном порядке; лимит проверяет check() */
+      const a0 = s.ads;
       if (rng() < 0.2) Core.startBoost(s);
+      if (rng() < 0.2) { const c0 = s.charge; if (Core.chargeStar(s) && (s.charge !== Core.chargeMax(s) || c0 >= Core.chargeMax(s))) note('звезда заряжена не так', String(c0)); }
+      if (rng() < 0.2) Core.startSale(s);
+      if (s.ads - a0 > 3 || (a0 >= Core.AD_LIMIT && s.ads !== a0)) note('бонус прошёл мимо лимита', `${a0}->${s.ads}`);
+      if (rng() < 0.01) s.ads = Core.AD_LIMIT - 1;
       if (s.wonAt != null && rng() < 0.01) { Core.retire(s); retired++; check(s, 'пенсия'); continue; }
       const charged = Core.canCharge(s) && rng() < 0.5 ? ['work', 'study', 'health', 'network', 'chance'][Math.floor(rng() * 5)] : null;
       const res = Core.spin(s, rng, rng() < 0.15 ? { auto: true } : charged ? { charged } : null);
