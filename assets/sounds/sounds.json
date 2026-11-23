@@ -1,0 +1,149 @@
+{
+ "stop-1": {
+  "sound": "tap/tone",
+  "bytes": 1773,
+  "peak": 0.1999,
+  "loud": 0.0966,
+  "dur": 0.12
+ },
+ "stop-2": {
+  "sound": "tick/wood",
+  "bytes": 1485,
+  "peak": 0.7916,
+  "loud": 0.1807,
+  "dur": 0.1
+ },
+ "stop-3": {
+  "sound": "click/thock",
+  "bytes": 1485,
+  "peak": 0.6895,
+  "loud": 0.1797,
+  "dur": 0.09
+ },
+ "good-1": {
+  "sound": "menu/select",
+  "bytes": 4077,
+  "peak": 0.5253,
+  "loud": 0.2498,
+  "dur": 0.4
+ },
+ "good-2": {
+  "sound": "success/fifth",
+  "bytes": 4653,
+  "peak": 0.4416,
+  "loud": 0.2355,
+  "dur": 0.5
+ },
+ "good-3": {
+  "sound": "pop/pluck",
+  "bytes": 2925,
+  "peak": 0.4916,
+  "loud": 0.195,
+  "dur": 0.284
+ },
+ "big-1": {
+  "sound": "success/triad",
+  "bytes": 7821,
+  "peak": 0.6443,
+  "loud": 0.2391,
+  "dur": 0.9
+ },
+ "big-2": {
+  "sound": "level_up/fanfare",
+  "bytes": 8685,
+  "peak": 0.6269,
+  "loud": 0.2629,
+  "dur": 1
+ },
+ "big-3": {
+  "sound": "power_up/rise",
+  "bytes": 7533,
+  "peak": 0.6221,
+  "loud": 0.2282,
+  "dur": 0.85
+ },
+ "bad-1": {
+  "sound": "error/fall",
+  "bytes": 4365,
+  "peak": 0.3671,
+  "loud": 0.2398,
+  "dur": 0.45
+ },
+ "bad-2": {
+  "sound": "menu/back",
+  "bytes": 3501,
+  "peak": 0.5129,
+  "loud": 0.2703,
+  "dur": 0.35
+ },
+ "bad-3": {
+  "sound": "close/drop",
+  "bytes": 4365,
+  "peak": 0.44,
+  "loud": 0.2298,
+  "dur": 0.45
+ },
+ "buy-1": {
+  "sound": "send/lift",
+  "bytes": 3501,
+  "peak": 0.6686,
+  "loud": 0.2769,
+  "dur": 0.35
+ },
+ "buy-2": {
+  "sound": "coin/soft",
+  "bytes": 3501,
+  "peak": 0.4198,
+  "loud": 0.2342,
+  "dur": 0.35
+ },
+ "buy-3": {
+  "sound": "notify/mid_wood",
+  "bytes": 3213,
+  "peak": 0.5021,
+  "loud": 0.2278,
+  "dur": 0.3
+ },
+ "fork-1": {
+  "sound": "notify/lift",
+  "bytes": 5517,
+  "peak": 0.4384,
+  "loud": 0.2427,
+  "dur": 0.6
+ },
+ "fork-2": {
+  "sound": "open/lift",
+  "bytes": 4653,
+  "peak": 0.4346,
+  "loud": 0.2235,
+  "dur": 0.5
+ },
+ "fork-3": {
+  "sound": "notify/motif",
+  "bytes": 6669,
+  "peak": 0.4337,
+  "loud": 0.244,
+  "dur": 0.75
+ },
+ "tick-1": {
+  "sound": "hover_tick/mid",
+  "bytes": 1485,
+  "peak": 0.9676,
+  "loud": 0.1442,
+  "dur": 0.08
+ },
+ "tick-2": {
+  "sound": "menu/move",
+  "bytes": 1485,
+  "peak": 0.5465,
+  "loud": 0.2782,
+  "dur": 0.1
+ },
+ "tick-3": {
+  "sound": "tick/soft",
+  "bytes": 1197,
+  "peak": 0.9944,
+  "loud": 0.1466,
+  "dur": 0.041
+ }
+}

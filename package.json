@@ -13,7 +13,9 @@
     "test:monkey": "npm run build && node tests/monkey.js dist/zero-to-millionaire.html 60",
     "test:sweep": "npm run build && node tests/sweep.js dist/zero-to-millionaire.html",
     "test:all": "npm run build && node tests/e2e.js dist/zero-to-millionaire.html && node tests/edges.js dist/zero-to-millionaire.html && node tests/forks.js dist/zero-to-millionaire.html && npm run test:fuzz",
-    "sim": "node tools/sim.js"
+    "sim": "node tools/sim.js",
+    "sfx": "node tools/sfx.js",
+    "test:sound": "npm run build && node tests/sound-check.js dist/sound-check.html"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

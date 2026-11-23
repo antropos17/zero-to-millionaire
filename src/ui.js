@@ -302,21 +302,29 @@
   function pulse(node, cls) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
 
   /* ---------- Звук: выключен, пока игрок сам не включит ---------- */
-  let audio = null;
-  function tone(freq, dur, type, vol, delay) {
-    if (!M.sound) return;
-    try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const t0 = audio.currentTime + (delay || 0);
-      const o = audio.createOscillator(), gn = audio.createGain();
-      o.type = type || 'triangle'; o.frequency.value = freq;
-      gn.gain.setValueAtTime(vol || 0.07, t0);
-      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(gn).connect(audio.destination);
-      o.start(t0); o.stop(t0 + dur + 0.02);
-    } catch (e) { /* без звука */ }
+  /* Каждый звук — записанный дубль earshot (SOUND_DATA: mp3 в base64, вклеивает сборка из assets/sounds, выбор в tools/sfx.json).
+     Дубли декодируются один раз, когда звук включён и игрок коснулся страницы или прозвучал первый звук.
+     Пока дубль не готов, не декодировался или событие в sfx.json помечено synth, играет прежний синтез (SYNTH). */
+  let audio = null, out = null;
+  const VOLUME = 1.4; /* общая громкость всех звуков, дублей и синтеза: один узел перед выходом */
+  const takes = typeof SOUND_DATA === 'object' && SOUND_DATA ? SOUND_DATA : {};
+  function ctx() {
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      out = audio.createGain(); out.gain.value = VOLUME; out.connect(audio.destination);
+    }
+    return audio;
   }
-  const sfx = {
+  function tone(freq, dur, type, vol, delay) {
+    const t0 = audio.currentTime + (delay || 0);
+    const o = audio.createOscillator(), gn = audio.createGain();
+    o.type = type || 'triangle'; o.frequency.value = freq;
+    gn.gain.setValueAtTime(vol || 0.07, t0);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gn).connect(out);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  const SYNTH = {
     stop: () => tone(220, 0.05, 'sine', 0.06),
     good: () => { tone(659, 0.1); tone(988, 0.16, 'triangle', 0.07, 0.08); },
     big: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, i * 0.08)),
@@ -324,6 +332,83 @@
     buy: () => { tone(784, 0.07, 'sine', 0.08); tone(1175, 0.1, 'sine', 0.07, 0.06); },
     fork: () => { tone(440, 0.12, 'sine', 0.08); tone(554, 0.12, 'sine', 0.08, 0.1); tone(659, 0.2, 'sine', 0.08, 0.2); },
     tick: () => tone(520, 0.03, 'sine', 0.04),
+  };
+  /* дубль: {d: mp3 в base64, g: усиление}; декодированный буфер и начало звука (без тишины кодека) кладутся в него же */
+  function decode(t) {
+    if (t.state) return;
+    t.state = 'decoding';
+    const t0 = performance.now();
+    const bin = atob(t.d), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const done = (buf) => {
+      const d = buf.getChannelData(0);
+      let peak = 0, i = 0;
+      for (let k = 0; k < d.length; k++) peak = Math.max(peak, Math.abs(d[k]));
+      while (i < d.length && Math.abs(d[i]) < peak * 0.01) i++;
+      t.buf = buf; t.lead = Math.max(0, i / buf.sampleRate - 0.002); t.ms = performance.now() - t0; t.state = 'ready';
+      flush(t);
+    };
+    const failed = () => { t.state = 'failed'; flush(t); };
+    try {
+      const p = audio.decodeAudioData(bytes.buffer, done, failed);
+      if (p && p.catch) p.catch(failed);
+    } catch (e) { failed(); }
+  }
+  /* звук, попросивший ещё не готовый дубль (включение звука, первый звук), ждёт его до 150 мс, потом звучит синтезом */
+  function flush(t) {
+    const w = t.wait || [];
+    t.wait = null;
+    w.forEach((x) => { if (!x.done) { x.done = true; sound(x.k); } });
+  }
+  function wake() {
+    if (!M.sound) return;
+    try {
+      ctx();
+      if (audio.state !== 'running' && audio.resume) { const p = audio.resume(); if (p && p.catch) p.catch(() => {}); }
+      for (const k in takes) decode(takes[k]);
+    } catch (e) { /* без звука */ }
+  }
+  /* Safari держит контекст, созданный не в нажатии, приостановленным: будим его касанием, заодно готовим дубли */
+  if (window.addEventListener) window.addEventListener('pointerdown', wake, true);
+  function take(t) {
+    if (!t || t.state !== 'ready') return false;
+    const src = audio.createBufferSource(), gn = audio.createGain();
+    src.buffer = t.buf; gn.gain.value = t.g;
+    src.connect(gn).connect(out);
+    src.start(audio.currentTime, t.lead);
+    return true;
+  }
+  function sound(k) {
+    try {
+      const how = take(takes[k]) ? 'take' : (SYNTH[k](), 'synth');
+      if (window.__sfxLog) window.__sfxLog.push([k, how]);
+    } catch (e) { /* без звука */ }
+  }
+  function play(k) {
+    if (!M.sound) return;
+    wake();
+    const t = takes[k];
+    if (!t || t.state !== 'decoding') { sound(k); return; }
+    const x = { k, done: false };
+    (t.wait = t.wait || []).push(x);
+    setTimeout(() => { if (!x.done) { x.done = true; sound(k); } }, 150);
+  }
+  /* одна фанфара на спин: результат, рост уровня (+650 мс) и рубеж (+750 мс) одного спина звучат одним big */
+  let lastBig = -1e9;
+  function onceASpin() {
+    const now = performance.now();
+    if (now - lastBig < 1000) return false;
+    lastBig = now;
+    return true;
+  }
+  const sfx = {
+    stop: () => play('stop'),
+    good: () => play('good'),
+    big: () => M.sound && onceASpin() && play('big'),
+    bad: () => play('bad'),
+    buy: () => play('buy'),
+    fork: () => play('fork'),
+    tick: () => play('tick'),
   };
 
   /* ---------- Барабаны ---------- */
@@ -349,6 +434,9 @@
     }
     const n = target.length;
     let left = n;
+    /* досрочно завершённые барабаны (второе «Крутить», уход со вкладки) встают разом: на всех один stop */
+    const started = performance.now();
+    let rushed = false;
     anims = strips.slice(0, n).map((strip, i) => {
       /* пролетающие символы берутся с теми же весами, что и настоящие */
       const filler = [];
@@ -365,7 +453,9 @@
       a.onfinish = () => {
         strip.style.transform = '';
         setReel(i, target[i]);
-        sfx.stop();
+        const early = performance.now() - started < a.effect.getTiming().duration - 30;
+        if (!early || !rushed) sfx.stop();
+        if (early) rushed = true;
         if (--left === 0) { anims = []; done(); }
       };
       return a;
@@ -451,11 +541,14 @@
     if (M.log.length > 40) M.log.length = 40;
   }
 
+  /* месяц, которым жизнь кончилась без миллиона, звучит только остановками барабанов: проигрыш беззвучен */
+  const lostLife = () => S.status !== 'playing' && S.wonAt == null;
+
   function milestone(value) {
     if (!value) return;
     const ride = Art.VEHICLE_NAMES[vehicleTier(S)];
     pushLog(`Рубеж: на счету ${short(value)}. В колоду легла карта Шанса` + (ride ? `, новый транспорт: ${ride.toLowerCase()}` : ''), null, 'star');
-    setTimeout(() => { floatLabel(`Рубеж ${short(value)}`, 'plain', { x: 0.3, y: 0.62 }); confetti(26, false); sfx.big(); }, reduceMotion ? 0 : 750);
+    setTimeout(() => { floatLabel(`Рубеж ${short(value)}`, 'plain', { x: 0.3, y: 0.62 }); confetti(26, false); if (!lostLife()) sfx.big(); }, reduceMotion ? 0 : 750);
   }
 
   function showResult(res) {
@@ -474,7 +567,7 @@
       if (res.mult >= 5) { pushLog(`Множитель ×${res.mult}`, null, 'star'); confetti(30, false); }
     }
     if (res.birthday) pulse($('ageText'), 'pop');
-    if (res.chargeFull) { sfx.tick(); pulse($('chargeBtn'), 'fresh'); floatLabel('Звезда готова', 'plain', { x: 0.72, y: 0.4 }); }
+    if (res.chargeFull) { if (!lostLife()) sfx.tick(); pulse($('chargeBtn'), 'fresh'); floatLabel('Звезда готова', 'plain', { x: 0.72, y: 0.4 }); }
     if (!res.combos.length) { milestone(res.milestone); return; }
 
     const HIT = { good: 'hit-good', bad: 'hit-bad', fork: 'hit-fork' };
@@ -487,21 +580,21 @@
     const big = res.combos.some((p) => p.tone === 'good' && p.count >= 3);
     const cash = good.reduce((a, p) => a + p.money, 0);
     if (bad.length && (!good.length || res.event < 0)) {
-      sfx.bad();
+      if (!lostLife()) sfx.bad();
       charAct('shake');
       floatLabel(signed(res.event || bad[0].money), 'bad');
       pulse($('money'), 'hurt');
     } else if (good.length) {
-      (big ? sfx.big : sfx.good)();
+      if (!lostLife()) (big ? sfx.big : sfx.good)();
       charAct('jump');
       floatLabel(res.event > 0 ? signed(res.event) : gainText(res.gain) || good[0].text, '');
       if (cash > 0) { coinFly(big ? 9 : 5); setTimeout(() => pulse($('money'), 'bump'), reduceMotion ? 0 : 560); }
       if (big) confetti(22, false);
-    } else if (res.tone === 'fork') sfx.fork();
+    } else if (res.tone === 'fork' && !lostLife()) sfx.fork();
 
     res.levelUps.forEach((u, i) => {
       pushLog(`${NAMES[u.sym]}: символ вырос до уровня ${u.level}`, null, 'star');
-      setTimeout(() => { floatLabel(`${NAMES[u.sym]}: уровень ${u.level}`, 'plain', { x: 0.3, y: 0.36 + i * 0.2 }); confetti(16, false); sfx.big(); }, reduceMotion ? 0 : 650);
+      setTimeout(() => { floatLabel(`${NAMES[u.sym]}: уровень ${u.level}`, 'plain', { x: 0.3, y: 0.36 + i * 0.2 }); confetti(16, false); if (!lostLife()) sfx.big(); }, reduceMotion ? 0 : 650);
     });
     milestone(res.milestone);
   }
@@ -591,11 +684,11 @@
     pushLog((res.gold ? 'Золотой вариант. ' : '') + res.text + (cards ? ': ' + cards : ''), res.delta || null, res.tone);
     if (res.promoted) { confetti(18, false); pulse($('jobText'), 'pop'); }
     if (res.tone === 'good') {
-      sfx.good(); charAct('jump');
+      if (!lostLife()) sfx.good(); charAct('jump');
       floatLabel(res.delta > 0 ? signed(res.delta) : extra || 'Готово', '');
       if (res.delta > 0) { coinFly(7); setTimeout(() => pulse($('money'), 'bump'), reduceMotion ? 0 : 560); }
     } else if (res.tone === 'bad') {
-      sfx.bad(); charAct('shake'); floatLabel(signed(res.delta), 'bad'); pulse($('money'), 'hurt');
+      if (!lostLife()) sfx.bad(); charAct('shake'); floatLabel(signed(res.delta), 'bad'); pulse($('money'), 'hurt');
     } else if (extra) floatLabel(extra, 'plain');
     milestone(res.milestone);
     render(prev);
