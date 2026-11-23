@@ -25,7 +25,10 @@
     },
   };
 
-  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], look: C.normLook(null, []) });
+  const freshMeta = () => ({ auto: true, speed: 1, sound: false, best: null, log: [], seenHelp: false, tab: 'shop', goals: [], pts: 0, perks: {}, owned: [], look: C.normLook(null, []), autobuy: C.normAuto(null) });
+  /* Случайность только для вида (пролетающие символы, монеты, конфетти): своя, не Math.random.
+     Так скорость и анимации не меняют, какие случайные числа достаются самой игре: ×1 и ×8 дают одну жизнь. */
+  const visRand = Math.random;
   let S = C.newState(null, 1);
   let M = freshMeta();
 
@@ -257,8 +260,8 @@
       const im = new Image();
       im.src = ICON.coin;
       fly.appendChild(im);
-      const sx = a.left + a.width * (0.2 + 0.6 * Math.random()), sy = a.top + a.height / 2;
-      const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 120, my = Math.min(sy, ty) - 30 - Math.random() * 50;
+      const sx = a.left + a.width * (0.2 + 0.6 * visRand()), sy = a.top + a.height / 2;
+      const mx = (sx + tx) / 2 + (visRand() - 0.5) * 120, my = Math.min(sy, ty) - 30 - visRand() * 50;
       const an = im.animate([
         { transform: `translate(${sx}px, ${sy}px) scale(0.4)`, opacity: 0 },
         { transform: `translate(${sx}px, ${sy - 14}px) scale(1.1)`, opacity: 1, offset: 0.12 },
@@ -276,14 +279,14 @@
       const p = document.createElement('i');
       p.style.background = cols[i % cols.length];
       fly.appendChild(p);
-      const x0 = r.left + r.width * (0.3 + Math.random() * 0.4), y0 = r.top + r.height * 0.45;
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = (big ? 150 : 90) + Math.random() * (big ? 190 : 110);
+      const x0 = r.left + r.width * (0.3 + visRand() * 0.4), y0 = r.top + r.height * 0.45;
+      const ang = -Math.PI / 2 + (visRand() - 0.5) * 2.2, v = (big ? 150 : 90) + visRand() * (big ? 190 : 110);
       const dx = Math.cos(ang) * v, dy = Math.sin(ang) * v;
       const an = p.animate([
         { transform: `translate(${x0}px, ${y0}px) rotate(0deg)`, opacity: 1 },
-        { transform: `translate(${x0 + dx * 0.8}px, ${y0 + dy}px) rotate(${200 + Math.random() * 200}deg)`, opacity: 1, offset: 0.38, easing: 'cubic-bezier(.4,0,.9,.6)' },
-        { transform: `translate(${x0 + dx * 1.15}px, ${y0 + dy + (big ? 420 : 260)}px) rotate(${500 + Math.random() * 300}deg)`, opacity: 0 },
-      ], { duration: (big ? 1900 : 1300) + Math.random() * 400, easing: 'cubic-bezier(.1,.7,.3,1)' });
+        { transform: `translate(${x0 + dx * 0.8}px, ${y0 + dy}px) rotate(${200 + visRand() * 200}deg)`, opacity: 1, offset: 0.38, easing: 'cubic-bezier(.4,0,.9,.6)' },
+        { transform: `translate(${x0 + dx * 1.15}px, ${y0 + dy + (big ? 420 : 260)}px) rotate(${500 + visRand() * 300}deg)`, opacity: 0 },
+      ], { duration: (big ? 1900 : 1300) + visRand() * 400, easing: 'cubic-bezier(.1,.7,.3,1)' });
       an.onfinish = () => p.remove();
     }
   }
@@ -431,6 +434,8 @@
     clearHits();
     if (dur <= 0 || !strips[0].animate) {
       target.forEach((sym, i) => setReel(i, sym));
+      /* на ×8 барабаны встают сразу: один звук остановки за спин вместо трёх-четырёх */
+      if (fast()) sfx.stop();
       done();
       return;
     }
@@ -442,7 +447,7 @@
     anims = strips.slice(0, n).map((strip, i) => {
       /* пролетающие символы берутся с теми же весами, что и настоящие */
       const filler = [];
-      for (let k = 0; k < 2 + i; k++) filler.push(...C.rollReels(S));
+      for (let k = 0; k < 2 + i; k++) filler.push(...C.rollReels(S, visRand));
       const cells = [cell(target[i]), ...filler.map(cell), cell(shown[i])];
       strip.replaceChildren(...cells);
       const h = reelEls[i].clientHeight;
@@ -465,7 +470,10 @@
   }
 
   /* ---------- Цикл спинов ---------- */
-  const SPEEDS = [1, 2, 4];
+  /* ×8 — товар «Скорость ×8» (полка «Удобство»): четвёртое положение есть только у владельца */
+  const speeds = () => (M.owned.includes('speed8') ? [1, 2, 4, 8] : [1, 2, 4]);
+  /* на ×8 барабаны не анимируются, как при «без анимаций»: 8 спинов в секунду анимация бы не успела */
+  const fast = () => M.speed >= 8;
   let phase = 'idle';
   let timer = null;
   let pending = null;
@@ -478,9 +486,10 @@
   let adOpen = false;
   let menuOpen = true;
   let storeOpen = false;
+  let autoOpen = false;
   const spinMs = () => 1000 / M.speed;
   const holdMs = () => 800 / M.speed;
-  const blocked = () => menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
+  const blocked = () => menuOpen || storeOpen || autoOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen || !!S.fork || !!S.traitOptions || S.status !== 'playing';
 
   /* chargedSym: символ «Своего месяца», если игрок потратил звезду */
   function startSpin(chargedSym) {
@@ -491,7 +500,7 @@
     phase = 'spinning';
     pending = reels;
     pendingCharged = typeof chargedSym === 'string' ? chargedSym : null;
-    animateReels(pending, reduceMotion ? 0 : spinMs(), finishSpin);
+    animateReels(pending, reduceMotion || fast() ? 0 : spinMs(), finishSpin);
   }
 
   function finishSpin() {
@@ -502,6 +511,7 @@
     phase = 'idle';
     if (!res) return;
     showResult(res);
+    autoStep();
     render(prev);
     save();
     if (S.status !== 'playing') { setTimeout(endLife, reduceMotion ? 0 : 500); return; }
@@ -509,7 +519,7 @@
     if (S.fork) { setTimeout(openFork, reduceMotion ? 0 : 450); return; }
     if (wantCharge && C.canCharge(S)) { openCharge(); return; }
     wantCharge = false;
-    schedule(reduceMotion ? spinMs() : 0);
+    schedule(reduceMotion || fast() ? spinMs() : 0);
   }
 
   function schedule(extra) {
@@ -803,6 +813,28 @@
     render(prev);
     save();
   }
+  /* ---------- Автопокупки: после каждого месяца, пока игра открыта и идёт ---------- */
+  /* Покупают через C.autoBuy ту же act(), что кнопки; догонялки «Пока тебя не было» и z2m.skip сюда не заходят.
+     Каждая покупка — запись в ленте с пометкой. Звука и вспышек нет: на ×8 это был бы звук каждый месяц. */
+  const ownsAuto = () => M.owned.includes('autobuy');
+  const AUTO_LOG = {
+    job: (i) => `Повышение: ${C.JOBS[i].name}`,
+    gym: () => 'Спортзал: здоровье +20',
+    home: (i) => `Переезд: ${C.HOMES[i].name}`,
+    asset: (i) => `Инвестиция: ${C.ASSETS[i].name}`,
+    reel: () => 'Четвёртый барабан',
+  };
+  const autoText = (b) => (AUTO_LOG[b.kind] ? AUTO_LOG[b.kind](b.lvl)
+    : `Улучшение: ${C.UPGRADES[b.kind.slice(3)].name}` + (C.UPGRADES[b.kind.slice(3)].costs.length > 1 ? `, уровень ${b.lvl}` : ''));
+  let lastAuto = [];
+  function autoStep() {
+    if (!ownsAuto() || !M.autobuy.on) return [];
+    const got = C.autoBuy(S, M.autobuy);
+    lastAuto = got;
+    got.forEach((b) => pushLog('Автопокупка. ' + autoText(b), b.cost ? -b.cost : null, 'auto'));
+    return got;
+  }
+
   function setFocus(f) {
     if (!C.setFocus(S, f)) return;
     sfx.tick();
@@ -1154,6 +1186,7 @@
     document.querySelector('.slot').classList.toggle('four', s.reels4);
     document.querySelector('.slot').classList.toggle('has-mult', s.up.mult > 0);
 
+    renderAutoBar();
     /* спин мог закончиться уже под открытым меню: сводка в нём не должна отставать */
     if (menuOpen) renderMenu();
     renderForecast();
@@ -1405,7 +1438,8 @@
     if (M.auto) schedule(); else clearTimeout(timer);
   });
   $('speedBtn').addEventListener('click', () => {
-    M.speed = SPEEDS[(SPEEDS.indexOf(M.speed) + 1) % SPEEDS.length];
+    const list = speeds();
+    M.speed = list[(list.indexOf(M.speed) + 1) % list.length];
     render(); save();
     if (phase !== 'spinning') schedule();
   });
@@ -1459,7 +1493,7 @@
     anims = []; phase = 'idle'; pending = null; pendingCharged = null; wantCharge = false; chargeOpen = false; traitOpen = false;
     $('chargeLay').hidden = true; $('traitLay').hidden = true; stopAd(); forkOpen = false; $('forkLay').hidden = true;
     store.clear();
-    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look };
+    const keep = { sound: M.sound, seenHelp: true, auto: M.auto, speed: M.speed, owned: M.owned, look: M.look, autobuy: M.autobuy };
     S = C.newState(null, 1);
     M = Object.assign(freshMeta(), keep);
     hideModal();
@@ -1481,6 +1515,74 @@
       setTimeout(() => { if (armed && Date.now() >= armed) { armed = 0; btn.textContent = idle; } }, 4100);
     });
   }
+
+  /* ---------- Окно «Автопокупки»: правила владельца, хранятся в метаданных между жизнями ---------- */
+  const AUTO_RULES = [
+    ['job', 'Повышение', 'Бесплатно, когда хватает навыка'],
+    ['gym', 'Спортзал', '+20 здоровья, пока не 100'],
+    ['home', 'Жильё', 'Следующий переезд'],
+    ['asset', 'Инвестиции', 'Следующая по списку'],
+    ['reel', 'Четвёртый барабан', 'Один раз за жизнь'],
+    ['up:mult', 'Множитель', 'Следующий уровень'],
+    ['up:star', 'Быстрая звезда', 'Следующий уровень'],
+    ['up:insure', 'Страховка', 'Следующий уровень'],
+    ['up:coach', 'Тренер', 'Один уровень'],
+  ];
+  const ruleOn = (k) => (k === 'job' ? M.autobuy.job : M.autobuy.kinds[k]);
+  const ruleCount = () => AUTO_RULES.filter(([k]) => ruleOn(k)).length;
+  function renderAutoBar() {
+    const bar = $('autoBar'), has = ownsAuto();
+    if (bar.hidden === has) bar.hidden = !has;
+    if (!has) return;
+    const a = M.autobuy, n = ruleCount();
+    $('autoToggle').setAttribute('aria-checked', String(a.on));
+    const sum = !a.on ? 'выключены' : !n ? 'ни одного правила' : S.sale ? 'ждут, пока ты потратишь скидку' : `${n} ${plural(n, 'правило', 'правила', 'правил')} · запас ×${a.reserve}`;
+    if ($('autoSum').textContent !== sum) $('autoSum').textContent = sum;
+  }
+  function renderAuto() {
+    const a = M.autobuy;
+    $('autoMain').setAttribute('aria-checked', String(a.on));
+    $('autoMain').firstElementChild.nextElementSibling.textContent = a.on ? 'Автопокупки включены' : 'Автопокупки выключены';
+    $('autoRes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.res === a.reserve)));
+    $('autoList').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(ruleOn(b.dataset.rule))));
+    $('autoList').classList.toggle('auto-off', !a.on);
+  }
+  $('autoRes').insertAdjacentHTML('beforeend', C.AUTO_RESERVES.map((r) => `<button class="btn btn-small" type="button" role="radio" data-res="${r}">× ${r}</button>`).join(''));
+  $('autoList').innerHTML = AUTO_RULES.map(([k, name, note]) => `<li><button class="auto-sw" type="button" role="switch" data-rule="${k}" aria-checked="false"><i aria-hidden="true"></i><b>${esc(name)}</b><span>${esc(note)}</span></button></li>`).join('');
+  function openAuto() {
+    if (!ownsAuto() || autoOpen || menuOpen || storeOpen || modalOpen || forkOpen || chargeOpen || traitOpen || adOpen) return;
+    autoOpen = true;
+    clearTimeout(timer);
+    if (phase === 'spinning') anims.slice().forEach((a) => a.finish());
+    renderAuto();
+    $('autoLay').hidden = false;
+    $('autoBox').focus();
+  }
+  function closeAuto() {
+    if (!autoOpen) return;
+    autoOpen = false;
+    $('autoLay').hidden = true;
+    save();
+    resume();
+  }
+  function setAuto(patch) {
+    M.autobuy = C.normAuto(Object.assign({}, M.autobuy, patch));
+    if (autoOpen) renderAuto();
+    renderAutoBar();
+    save();
+  }
+  $('autoToggle').addEventListener('click', () => { if (ownsAuto()) setAuto({ on: !M.autobuy.on }); });
+  $('autoEdit').addEventListener('click', openAuto);
+  $('autoClose').addEventListener('click', closeAuto);
+  $('autoLay').addEventListener('click', (e) => { if (e.target === $('autoLay')) closeAuto(); });
+  $('autoMain').addEventListener('click', () => setAuto({ on: !M.autobuy.on }));
+  $('autoRes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setAuto({ reserve: +b.dataset.res }); });
+  $('autoList').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const k = b.dataset.rule;
+    if (k === 'job') setAuto({ job: !M.autobuy.job }); else setAuto({ kinds: Object.assign({}, M.autobuy.kinds, { [k]: !M.autobuy.kinds[k] }) });
+  });
 
   /* ---------- Главное меню ---------- */
   let hasSave = false;
@@ -1756,7 +1858,6 @@
   let returning = false;
   if (saved && saved.M && typeof saved.M === 'object') {
     M = Object.assign(freshMeta(), saved.M);
-    if (!SPEEDS.includes(M.speed)) M.speed = 1;
     if (!Array.isArray(M.log)) M.log = [];
     if (!TABS.includes(M.tab)) M.tab = 'shop';
     if (!Array.isArray(M.goals)) M.goals = [];
@@ -1768,6 +1869,8 @@
     M.sound = M.sound === true; M.auto = M.auto !== false; M.seenHelp = M.seenHelp === true;
     M.perks = C.normPerks(M.perks);
     M.owned = C.normOwned(M.owned);
+    if (!speeds().includes(M.speed)) M.speed = 1;
+    M.autobuy = C.normAuto(M.autobuy);
     M.look = C.normLook(saved.M.look, M.owned, M.theme); /* до слотов тема лежала в M.theme */
     delete M.theme;
   }
@@ -1798,6 +1901,8 @@
     state: () => S,
     meta: () => JSON.parse(JSON.stringify(M)),
     refresh: () => { render(); save(); },
+    autoLast: () => lastAuto.map((b) => b.kind),
+    autoStep: () => { autoStep(); render(); },
     skip(n) {
       for (let i = 0; i < n && S.status === 'playing'; i++) C.spin(S, Math.random, { auto: true });
       render(); save();

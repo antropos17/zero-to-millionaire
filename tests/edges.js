@@ -199,7 +199,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.close();
     return r;
   };
-  const IDS = ['noads', 'theme-bill', 'theme-dusk', 'hero-street', 'hero-curls', 'home-terra', 'home-nord', 'epitaph-paper', 'epitaph-postcard', 'thanks'];
+  const IDS = ['noads', 'speed8', 'autobuy', 'theme-bill', 'theme-dusk', 'hero-street', 'hero-curls', 'home-terra', 'home-nord', 'epitaph-paper', 'epitaph-postcard', 'thanks'];
   const but = (...x) => IDS.filter((id) => !x.includes(id)).sort().join(',');
   const ALL = but();
   const B = 'base,base,base,base';
@@ -222,6 +222,38 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     const before = errors.length;
     const r = await shopSeen(M);
     ok(`магазин, сохранение «${name}»: купленное и выбор прочитаны честно`, errors.length === before && r.buy === buy && r.theme === lk.split(',')[0] && r.look === lk && !r.hasTheme && r.scene.hero === (lk.split(',')[1] !== 'base') && r.thanks === thanks && !r.junk, JSON.stringify(r));
+  }
+  /* «Удобство»: ×8 и правила автопокупок без покупки не действуют, мусор в правилах читается как «всё выключено» */
+  const comfortSeen = async (M) => {
+    const p = await open(null, mut((c) => { c.M = Object.assign({ seenHelp: true, auto: false }, M); c.S.money = 90000; c.S.peak = 90000; c.S.ms = 9; c.S.fork = null; c.S.traitOptions = null; }));
+    await p.click('#menuPlay'); await p.waitForTimeout(300);
+    await p.click('#tabBtn-shop');
+    const r = await p.evaluate(() => ({ speed: window.z2m.meta().speed, a: window.z2m.meta().autobuy, bar: !document.getElementById('autoBar').hidden }));
+    const m0 = (await st(p)).money;
+    await p.click('#spinBtn'); await p.waitForTimeout(2600);
+    r.bought = await p.evaluate(() => window.z2m.autoLast().length);
+    r.log = await p.evaluate(() => window.z2m.meta().log.some((e) => /Автопокупка/.test(e.text)));
+    r.junk = await junk(p);
+    r.money = m0;
+    await p.close();
+    return r;
+  };
+  const OFF = (a) => a && a.on === false && a.job === false && a.reserve === 3 && Object.values(a.kinds).every((v) => v === false) && Object.keys(a.kinds).length === 8;
+  const RULES = { on: true, reserve: 3, job: true, kinds: { gym: true, home: true, asset: true } };
+  const comfortCases = [
+    ['×8 без покупки', { speed: 8 }, (r) => r.speed === 1 && !r.bar],
+    ['×8 строкой у владельца', { owned: ['speed8'], speed: '8' }, (r) => r.speed === 1],
+    ['×8 у владельца', { owned: ['speed8'], speed: 8 }, (r) => r.speed === 8],
+    ['правила без покупки', { autobuy: RULES }, (r) => !r.bar && r.bought === 0 && !r.log],
+    ['правила строкой', { owned: ['autobuy'], autobuy: 'on' }, (r) => r.bar && OFF(r.a) && r.bought === 0],
+    ['правила: мусор в полях', { owned: ['autobuy'], autobuy: { on: 'yes', reserve: 1, job: 1, kinds: { gym: 'true', zzz: true, home: [1] } } }, (r) => r.bar && OFF(r.a) && r.bought === 0],
+    ['правила с чужим запасом', { owned: ['autobuy'], autobuy: { on: true, reserve: 99, job: false, kinds: { gym: true } } }, (r) => r.a.reserve === 3 && r.a.kinds.gym === true],
+    ['правила у владельца', { owned: ['autobuy'], autobuy: RULES }, (r) => r.bar && r.a.on && r.bought > 0 && r.log],
+  ];
+  for (const [name, M, want] of comfortCases) {
+    const before = errors.length;
+    const r = await comfortSeen(M);
+    ok(`«Удобство», сохранение «${name}»: прочитано честно`, errors.length === before && want(r) && !r.junk, JSON.stringify(r));
   }
   /* «Новая игра» стирает жизнь, но не покупки и выбор */
   p = await open(null, mut((c) => { c.M.owned = IDS; c.M.look = { theme: 'bill', hero: 'curls', home: 'terra', epitaph: 'paper' }; c.M.seenHelp = true; }));

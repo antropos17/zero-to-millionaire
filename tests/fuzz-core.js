@@ -43,6 +43,27 @@ function check(s, where) {
   const back = JSON.parse(txt);
   if (JSON.stringify(back) !== txt) note('сохранение не восстанавливается', where);
 }
+/* автопокупки: та же act() по тем же ценам; в минус не уводят, колоду, фокус, звезду, рекламу и развилки не трогают */
+let autoLives = 0, autoBought = 0;
+function autoCheck(s, rules, where) {
+  const t = JSON.parse(JSON.stringify(s)), m0 = s.money;
+  const got = Core.autoBuy(s, rules);
+  if (!Array.isArray(got)) { note('автопокупки вернули не список', where); return; }
+  autoBought += got.length;
+  if ((t.fork || t.traitOptions || t.status !== 'playing' || !rules.on) && got.length) note('автопокупка не вовремя', where);
+  if (m0 >= 0 && s.money < 0) note('автопокупки увели деньги в минус', where + ` ${m0}->${s.money}`);
+  for (const k of ['focus', 'ads', 'boost', 'boostAt', 'starAt', 'saleAt', 'sale', 'perks', 'fork', 'traitOptions', 'trait', 'trait4', 'month', 'skill', 'network']) if (JSON.stringify(t[k]) !== JSON.stringify(s[k])) note('автопокупки тронули ' + k, where);
+  for (const b of got) {
+    if (b.kind !== 'job' && !Core.AUTO_KINDS.includes(b.kind)) note('автопокупка вне списка: ' + b.kind, where);
+    if (b.kind !== 'job' && t.sale) note('автопокупка потратила скидку', where);
+    if (b.kind !== 'job' && !rules.kinds[b.kind]) note('автопокупка без правила: ' + b.kind, where);
+    if (b.kind === 'job' && !rules.job) note('повышение без правила', where);
+    const c = b.kind === 'job' ? 0 : Core.costOf(t, b.kind);
+    if (c !== b.cost || (b.kind !== 'job' && t.money < c * rules.reserve)) note('автопокупка не по цене или без запаса: ' + b.kind, where + ` ${t.money}/${c}/${b.cost}`);
+    if (!Core.act(t, b.kind)) note('ручная покупка того же не прошла: ' + b.kind, where);
+  }
+  if (JSON.stringify(t) !== JSON.stringify(s)) note('автопокупки не равны тем же ручным покупкам', where);
+}
 let lives = 0, steps = 0, forks = 0, golds = 0, won = 0, lost = 0, retired = 0, maxMoney = 0;
 const N = +process.argv[2] || 1500;
 for (let i = 0; i < N; i++) {
@@ -50,7 +71,9 @@ for (let i = 0; i < N; i++) {
   const perks = {}; for (const id of Core.PERK_IDS) if (rng() < 0.4) perks[id] = Math.floor(rng() * 8) - 1;
   let s = Core.newState(rng() < 0.5 ? perks : null, 1 + Math.floor(rng() * 3), rng);
   check(s, 'старт');
-  const style = Math.floor(rng() * 4); /* 0 случайный, 1 жадный покупатель, 2 должник, 3 почти ничего не делает */
+  const style = Math.floor(rng() * 4);
+  const rules = rng() < 0.4 ? Core.normAuto({ on: rng() < 0.9, reserve: Core.AUTO_RESERVES[Math.floor(rng() * Core.AUTO_RESERVES.length)], job: rng() < 0.5, kinds: Object.fromEntries(Core.AUTO_KINDS.map((k) => [k, rng() < 0.6])) }) : null;
+  if (rules) autoLives++; /* 0 случайный, 1 жадный покупатель, 2 должник, 3 почти ничего не делает */
   let guard = 0;
   while (s.status === 'playing' && guard++ < 5000) {
     try {
@@ -90,6 +113,7 @@ for (let i = 0; i < N; i++) {
       if (res && /undefined|NaN/.test(JSON.stringify(res))) note('плохой итог спина', JSON.stringify(res).slice(0, 120));
       steps++;
       check(s, 'спин');
+      if (rules) { autoCheck(s, rules, 'автопокупки, месяц ' + s.month); check(s, 'автопокупки'); }
       if (rng() < 0.002) { s = Core.migrate(JSON.parse(JSON.stringify(s))); check(s, 'пересохранение'); }
     } catch (e) { note('исключение: ' + e.message, (e.stack || '').split('\n')[1]); break; }
   }
@@ -98,6 +122,7 @@ for (let i = 0; i < N; i++) {
   if (s.status === 'won') won++; else if (s.status === 'lost') lost++;
   try { const g = Core.goalsMet(s), p = Core.lifePoints(s); if (!Array.isArray(g) || !(p >= 1 && p <= 5)) note('цели или опыт сломаны', String(p)); } catch (e) { note('исключение в целях: ' + e.message, ''); }
 }
+console.log(`жизней с автопокупками ${autoLives}, автопокупок ${autoBought}`);
 console.log(`жизней ${lives}, спинов ${steps}, развилок ${forks} (золотых ${golds}), миллион ${won}, проигрыш ${lost}, пенсий ${retired}, максимум денег $${Math.round(maxMoney / 1e6)} млн`);
 const keys = Object.keys(bad);
 console.log(keys.length ? 'ПРОБЛЕМЫ:\n' + keys.map((k) => `  ${bad[k].n}×  ${k}  [${bad[k].d}]`).join('\n') : 'нарушений нет');

@@ -112,6 +112,13 @@ policies['casual+ad'] = Object.assign({}, policies.casual, { ads: true });
 policies['smart+ad'] = Object.assign({}, policies.smart, { ads: true, adPlan: true });
 /* берёт золотой вариант в каждой развилке, где он есть */
 policies.allgold = Object.assign({}, policies.smart, { ads: true, fork: () => 0 });
+/* Автопокупки (товар «Автопокупки»): все правила включены, запас RESERVE (по умолчанию наименьший из Core.AUTO_RESERVES), повышение тоже (AUTO_NOJOB=1 — без него).
+   В игре автопокупка срабатывает после спина; здесь — в начале хода, то есть после спина прошлого месяца. */
+const AUTO_ALL = { on: true, reserve: +process.env.RESERVE || Core.AUTO_RESERVES[0], job: !process.env.AUTO_NOJOB, kinds: Object.fromEntries(Core.AUTO_KINDS.map((k) => [k, !(process.env.AUTO_SKIP || '').split(',').includes(k)])) };
+/* ничего не нажимает сам, но включил все автопокупки; от развилок отказывается, фокус «Работа» */
+policies.autoidle = { turn(s) { Core.autoBuy(s, AUTO_ALL); }, fork: () => 1 };
+/* только держит фокус на Учёбе, пока есть следующая должность (потом Работа), и включил все автопокупки */
+policies.autostudy = { turn(s) { Core.setFocus(s, Core.nextJob(s) ? 'study' : 'work'); Core.autoBuy(s, AUTO_ALL); }, fork: () => 1 };
 
 const PERK_SETS = { 0: {}, 1: { genes: 2, cash: 2, school: 1, tough: 1, sale: 1, ties: 1 }, 2: { cash: 4, genes: 5, tough: 3, ties: 3, school: 3, sale: 3, star: 1, traits: 2, joker: 1 } };
 const STAY = !!process.env.STAY;

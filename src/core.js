@@ -57,6 +57,7 @@ const Core = (() => {
      slot + value: какой вариант внешнего вида открывает товар (слоты — LOOK_SLOTS) */
   const STORE_SHELVES = [
     { id: 'noads', name: 'Без рекламы' },
+    { id: 'comfort', name: 'Удобство' },
     { id: 'look', name: 'Внешний вид' },
     { id: 'support', name: 'Поддержать автора' },
   ];
@@ -71,6 +72,8 @@ const Core = (() => {
   const LOOK_SLOT_IDS = LOOK_SLOTS.map((sl) => sl.id);
   const STORE = {
     noads: { shelf: 'noads', name: 'Без рекламы', note: 'Бонусы за рекламу сразу, без ролика. Сами бонусы и их ограничения те же', once: true },
+    speed8: { shelf: 'comfort', name: 'Скорость ×8', note: 'Четвёртое положение переключателя скорости. Месяцы и шансы те же, только идут быстрее', once: true },
+    autobuy: { shelf: 'comfort', name: 'Автопокупки', note: 'Покупает то же, что купил бы ты, по тем же ценам, когда хватает денег с запасом. Фокус, развилки, звезду и колоду не трогает', once: true },
     'theme-bill': { shelf: 'look', name: 'Тема «Зелёная купюра»', note: 'Цвета интерфейса: зелёный и тёмно-зелёный', once: true, slot: 'theme', value: 'bill' },
     'theme-dusk': { shelf: 'look', name: 'Тема «Вечер на вилле»', note: 'Цвета интерфейса: фиолетовый и сливовый', once: true, slot: 'theme', value: 'dusk' },
     'hero-street': { shelf: 'look', name: 'Облик «Двор»', note: 'Вязаная шапка, яркие кеды и тёмные джинсы', once: true, slot: 'hero', value: 'street' },
@@ -102,6 +105,18 @@ const Core = (() => {
   const ownsTheme = (owned, theme) => ownsLook(owned, 'theme', theme);
   const normTheme = (theme, owned) => normLook({ theme }, owned).theme;
   const noAds = (owned) => normOwned(owned).includes('noads');
+  /* Автопокупки (товар autobuy): правила игрока, лежат в метаданных между жизнями.
+     on: общий выключатель; reserve: покупать, когда денег не меньше цены × запас; job: брать бесплатное повышение;
+     kinds: какие покупки вкладки «Покупки» брать. По умолчанию всё выключено.
+     Запас не ниже ×3: с ×1 и ×2 игрок, который ничего не нажимает, выигрывал заметно чаще и раньше бота nofocus
+     (docs/BALANCE-REPORT.md, раздел «Автопокупки»). */
+  const AUTO_KINDS = ['gym', 'home', 'asset', 'reel', 'up:mult', 'up:star', 'up:insure', 'up:coach'];
+  const AUTO_RESERVES = [3, 4, 5];
+  const normAuto = (a) => {
+    const src = a && typeof a === 'object' && !Array.isArray(a) ? a : {}, ks = src.kinds && typeof src.kinds === 'object' ? src.kinds : {}, kinds = {};
+    AUTO_KINDS.forEach((k) => { kinds[k] = ks[k] === true; });
+    return { on: src.on === true, reserve: AUTO_RESERVES.includes(src.reserve) ? src.reserve : AUTO_RESERVES[0], job: src.job === true, kinds };
+  };
 
   /* Богатство к концу жизни даёт дополнительный опыт */
   const WEALTH = [5000000, 25000000, 100000000];
@@ -1296,6 +1311,31 @@ const Core = (() => {
     return true;
   }
 
+  /* Автопокупки: нажимают ту же act(), что и игрок, по тем же ценам (costOf).
+     Пока включена скидка за рекламу, платного не берут: скидку тратит сам игрок.
+     Сначала бесплатное повышение, потом самое дешёвое из включённого, пока денег не меньше цены × запас.
+     Запас не меньше 1, поэтому деньги автопокупка в минус не уводит.
+     Возвращает купленное по порядку: { kind, cost, lvl } — lvl это должность, жильё, номер инвестиции или уровень улучшения после покупки. */
+  const autoLvl = (s, k) => (k === 'job' ? s.job : k === 'home' ? s.home : k === 'asset' ? s.assets - 1 : k.slice(0, 3) === 'up:' ? s.up[k.slice(3)] : null);
+  function autoBuy(s, rules) {
+    const a = normAuto(rules), out = [];
+    if (!a.on || s.status !== 'playing' || s.fork || s.traitOptions) return out;
+    if (a.job) while (act(s, 'job')) out.push({ kind: 'job', cost: 0, lvl: s.job });
+    /* скидка за рекламу ждёт покупки, которую выберет сам игрок: пока она не потрачена, платного не берём */
+    if (s.sale) return out;
+    for (let guard = 0; guard < 24; guard++) {
+      let best = null;
+      for (const k of AUTO_KINDS) {
+        if (!a.kinds[k]) continue;
+        const c = costOf(s, k);
+        if (c != null && s.money >= c * a.reserve && (!best || c < best[1])) best = [k, c];
+      }
+      if (!best || !act(s, best[0])) break;
+      out.push({ kind: best[0], cost: best[1], lvl: autoLvl(s, best[0]) });
+    }
+    return out;
+  }
+
   function setFocus(s, f) {
     if (s.status !== 'playing' || !FOCI.includes(f)) return false;
     s.focus = f;
@@ -1391,6 +1431,7 @@ const Core = (() => {
     gymCost, homeCost, assetCost, reelCost, nextJob, costOf, goalsMet, goalLost, MIN_CARDS, chronicle,
     STORE, STORE_IDS, STORE_SHELVES, THEMES, THEME_BASE, normOwned, normTheme, ownsTheme, noAds,
     LOOK_BASE, LOOK_SLOTS, LOOK_SLOT_IDS, lookValues, ownsLook, normLook,
+    AUTO_KINDS, AUTO_RESERVES, normAuto, autoBuy,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;

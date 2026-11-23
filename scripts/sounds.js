@@ -17,12 +17,12 @@ const block = m[1];
 if (!/const sfx = \{/.test(block) || !/const SYNTH = \{/.test(block) || !/function tone\(/.test(block)) fail('в блоке «Звук» нет tone, SYNTH или sfx');
 
 /* Тайминги автоспина живут в ui.js; страница копирует их и проверяет, что в игре они прежние */
-const TIMING = ['const SPEEDS = [1, 2, 4];', 'const spinMs = () => 1000 / M.speed;', 'const holdMs = () => 800 / M.speed;', 'duration: dur * (0.62 + i * 0.38 / (n - 1))'];
+const TIMING = ["M.owned.includes('speed8') ? [1, 2, 4, 8] : [1, 2, 4]", 'const fast = () => M.speed >= 8;', 'animateReels(pending, reduceMotion || fast() ? 0 : spinMs(), finishSpin);', 'schedule(reduceMotion || fast() ? spinMs() : 0);', 'const spinMs = () => 1000 / M.speed;', 'const holdMs = () => 800 / M.speed;', 'duration: dur * (0.62 + i * 0.38 / (n - 1))'];
 for (const t of TIMING) if (!ui.includes(t)) fail('в src/ui.js поменялся тайминг, обнови typicalMinute в scripts/sounds.js: ' + t);
 
 /* Подписи к кнопкам. Ключи обязаны совпадать с sfx в ui.js и с событиями в tools/sfx.json */
 const SOUNDS = [
-  ['stop', 'Остановка барабана', 'Каждый барабан, встав на место. За спин 3 или 4 раза подряд; досрочная остановка — один раз'],
+  ['stop', 'Остановка барабана', 'Каждый барабан, встав на место. За спин 3 или 4 раза подряд; досрочная остановка — один раз; на ×8 (барабаны встают сразу) — один раз за спин'],
   ['good', 'Хороший месяц', 'Пара или тройка хорошего символа; хороший выбор в развилке; включение звука'],
   ['big', 'Большая удача', 'Тройка хорошего символа, рубеж капитала, рост уровня символа, «Удачный год», первый миллион, конец жизни с миллионом. Не чаще раза в секунду'],
   ['bad', 'Плохой месяц', 'Выпали счета (и они перевесили хорошее); плохой выбор в развилке'],
@@ -46,6 +46,7 @@ const makeSounds = `function makeSounds(window, SOUND_DATA) {\n  const M = { sou
 
 /* Расписание звуков автоспина: повторяет finishSpin / showResult / applyFork из ui.js.
    Игрок на развилке думает 1,5 с и берёт первый вариант; звезду и рекламу не трогает.
+   На ×8 барабаны встают сразу (один stop в начале спина), результат звучит тут же, следующий спин через spin + hold
    big, как в игре, не чаще раза в секунду (sfx.big) — одно расписание для дублей и для синтеза */
 function typicalMinute(Core, speed, ms, rng) {
   const C = Core, S = C.newState({}, 1, rng), out = [];
@@ -55,9 +56,9 @@ function typicalMinute(Core, speed, ms, rng) {
   const milestone = (t, v) => { if (v) at(t + 750, 'big'); };
   let t = 0, spins = 0;
   while (t < ms && S.status === 'playing') {
-    const reels = C.rollReels(S, rng), n = reels.length;
-    for (let i = 0; i < n; i++) at(t + spin * (0.62 + i * 0.38 / (n - 1)), 'stop');
-    const end = t + spin;
+    const reels = C.rollReels(S, rng), n = reels.length, instant = speed >= 8;
+    if (instant) at(t, 'stop'); else for (let i = 0; i < n; i++) at(t + spin * (0.62 + i * 0.38 / (n - 1)), 'stop');
+    const end = instant ? t : t + spin;
     const res = C.resolve(S, reels, rng);
     spins++;
     if (res.chargeFull) at(end, 'tick');
@@ -79,7 +80,7 @@ function typicalMinute(Core, speed, ms, rng) {
       t = pick + hold + 300;
       continue;
     }
-    t = end + hold;
+    t = end + hold + (instant ? spin : 0);
   }
   out.sort((a, b) => a[0] - b[0]);
   let lastBig = -1e9;
@@ -127,7 +128,8 @@ pre{background:var(--card);border:1px solid var(--line);border-radius:8px;paddin
 <ul>
 <li><div class="pair"><button type="button" data-combo="take">Спин ×1</button><button type="button" class="synth" data-combo="synth">Спин ×1 · синтез</button><div><b>Один обычный спин на ×1</b><small>3 остановки барабанов и «Хороший месяц» сразу после последней</small></div></div></li>
 <li><div class="pair"><button type="button" data-minute="1" data-set="take">Минута ×1</button><button type="button" class="synth" data-minute="1" data-set="synth">Минута ×1 · синтез</button><div><b>Скорость ×1</b><small id="m1"></small></div></div></li>
-<li><div class="pair"><button type="button" data-minute="4" data-set="take">Минута ×4</button><button type="button" class="synth" data-minute="4" data-set="synth">Минута ×4 · синтез</button><div><b>Скорость ×4 (самая быстрая)</b><small id="m4"></small></div></div></li>
+<li><div class="pair"><button type="button" data-minute="4" data-set="take">Минута ×4</button><button type="button" class="synth" data-minute="4" data-set="synth">Минута ×4 · синтез</button><div><b>Скорость ×4 (самая быстрая без покупки)</b><small id="m4"></small></div></div></li>
+<li><div class="pair"><button type="button" data-minute="8" data-set="take">Минута ×8</button><button type="button" class="synth" data-minute="8" data-set="synth">Минута ×8 · синтез</button><div><b>Скорость ×8 (товар «Скорость ×8»)</b><small id="m8"></small></div></div></li>
 </ul>
 <h2>Как сменить выбор</h2>
 <p>В <code>tools/sfx.json</code> у события поменять <code>"pick"</code> на 1, 2, 3 или <code>"synth"</code> (прежний синтез) и пересобрать. earshot для этого не нужен. Или одной командой:</p>
@@ -172,7 +174,7 @@ document.addEventListener('click', (e) => {
   if (b.dataset.minute) minute(+b.dataset.minute, b.dataset.set, b);
 });
 const plans = {};
-for (const sp of [1, 4]) {
+for (const sp of [1, 4, 8]) {
   plans[sp] = typicalMinute(Core, sp, 60000, Math.random);
   const c = {}; plans[sp].events.forEach(([, k]) => { c[k] = (c[k] || 0) + 1; });
   document.getElementById('m' + sp).textContent = plans[sp].spins + ' спинов, ' + plans[sp].events.length + ' звуков за минуту: ' + Object.entries(c).map(([k, v]) => k + ' ' + v).join(', ');
