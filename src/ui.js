@@ -30,12 +30,13 @@
   let M = freshMeta();
 
   function validState(s) {
-    if (!s || s.v !== 7) return false;
+    if (!s || s.v !== 8) return false;
     if (!Array.isArray(s.story) || !s.story.every((e) => e && typeof e === 'object' && typeof e.m === 'number' && isFinite(e.m) && typeof e.k === 'string')) return false;
-    const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt'];
+    const nums = ['money', 'month', 'job', 'skill', 'health', 'network', 'home', 'assets', 'billsCut', 'cut', 'ms', 'life', 'peak', 'earned', 'charge', 'boost', 'boostAt', 'ads', 'starAt', 'saleAt'];
     const num = (v) => typeof v === 'number' && isFinite(v);
     if (!nums.every((k) => num(s[k]))) return false;
     if (!s.xp || !C.LEVELED.every((k) => num(s.xp[k])) || typeof s.reels4 !== 'boolean') return false;
+    if (typeof s.sale !== 'boolean' || typeof s.trait4 !== 'boolean' || s.ads < 0 || s.ads > C.AD_LIMIT) return false;
     if (!s.deck || !C.SYMBOLS.every((k) => num(s.deck[k]) && s.deck[k] >= C.MIN_CARDS[k])) return false;
     if (!s.bought || !C.BUYABLE.every((k) => num(s.bought[k]))) return false;
     if (!s.flags || typeof s.flags.debt !== 'boolean' || typeof s.flags.low !== 'boolean' || !num(s.flags.yes) || !num(s.flags.gold)) return false;
@@ -526,7 +527,7 @@
     if (f.gold) {
       g.children[0].textContent = ownsNoAds() ? 'Золотой: без рекламы' : 'Золотой: за рекламу';
       g.children[1].textContent = f.gold.label;
-      g.children[2].textContent = f.gold.enabled ? f.gold.note : 'Не хватает денег';
+      g.children[2].textContent = f.gold.limit ? 'Лимит бонусов на эту жизнь исчерпан' : f.gold.enabled ? f.gold.note : 'Не хватает денег';
       g.disabled = !f.gold.enabled;
     }
     $('forkLay').hidden = false;
@@ -563,7 +564,7 @@
     if (!adOpen) return;
     stopAd();
     openedAt = Date.now();
-    if (forkOpen) $('forkBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
+    if (forkOpen) $('forkBox').focus(); else if (traitOpen) $('traitBox').focus(); else if (modalOpen) $('modalBox').focus(); else schedule();
   }
   /* Купленное «Без рекламы» отдаёт тот же бонус сразу, без ролика: суммы и ограничения не меняются */
   function ownsNoAds() { return C.noAds(M.owned); }
@@ -657,8 +658,32 @@
       render(); save(); schedule(300);
     });
   }
+  function useStar(li) {
+    if (!C.starReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    withAd(() => {
+      if (!C.chargeStar(S)) { schedule(); return; }
+      sfx.big();
+      pushLog('Звезда заряжена: «Свой месяц» готов', null, 'star');
+      floatLabel('Звезда заряжена', '');
+      pulse(li, 'flash');
+      render(); save(); schedule(300);
+    });
+  }
+  function useSale(li) {
+    if (!C.saleReady(S) || modalOpen || forkOpen || chargeOpen || traitOpen) return;
+    withAd(() => {
+      if (!C.startSale(S)) { schedule(); return; }
+      sfx.big();
+      pushLog(`Скидка ${Math.round(C.SALE_CUT * 100)}% на следующую покупку`, null, 'star');
+      floatLabel(`Скидка −${Math.round(C.SALE_CUT * 100)}%`, '');
+      pulse(li, 'flash');
+      render(); save(); schedule(300);
+    });
+  }
   function buy(kind, li) {
     if (kind === 'boost') { useBoost(li); return; }
+    if (kind === 'ad-star') { useStar(li); return; }
+    if (kind === 'ad-sale') { useSale(li); return; }
     const before = S.money, prev = { job: S.job, home: S.home };
     if (!C.act(S, kind)) return;
     sfx.buy();
@@ -692,8 +717,9 @@
 
   /* ---------- Отрисовка состояния ---------- */
   const shopRows = {}, deckRows = {};
-  const rowOf = (li) => ({ li, h: li.querySelector('h3'), p: li.querySelector('p'), b: li.querySelector('.btn-buy'), hint: li.querySelector('small'), max: li.querySelector('.max-btn'), was: false });
-  const SHOP_ICON = { boost: 'star', job: 'work', gym: 'gym', home: 'home', asset: 'asset', reel: 'reel', 'up-mult': 'mult', 'up-star': 'star', 'up-insure': 'finlit', 'up-coach': 'coach' };
+  const AD_ROWS = ['boost', 'ad-star', 'ad-sale'];
+  const rowOf = (li) => ({ li, act: li.querySelector('.shop-act'), h: li.querySelector('h3'), p: li.querySelector('p'), b: li.querySelector('.btn-buy'), hint: li.querySelector('small'), max: li.querySelector('.max-btn'), was: false });
+  const SHOP_ICON = { boost: 'star', 'ad-star': 'star', 'ad-sale': 'finlit', job: 'work', gym: 'gym', home: 'home', asset: 'asset', reel: 'reel', 'up-mult': 'mult', 'up-star': 'star', 'up-insure': 'finlit', 'up-coach': 'coach' };
   document.querySelectorAll('#shop li').forEach((li) => {
     li.querySelector('img').src = ICON[SHOP_ICON[li.dataset.kind]];
     shopRows[li.dataset.kind] = rowOf(li);
@@ -710,6 +736,9 @@
     if (verb.textContent !== o.verb) verb.textContent = o.verb || '';
     if (price.textContent !== (o.price || '')) price.textContent = o.price || '';
     r.b.disabled = !o.enabled;
+    /* метка скидки лежит поверх угла кнопки и ничего не сдвигает */
+    const tag = o.sale || '';
+    if ((r.act.dataset.sale || '') !== tag) { if (tag) r.act.dataset.sale = tag; else delete r.act.dataset.sale; }
     r.b.style.setProperty('--p', Math.round(Math.max(0, Math.min(1, o.progress || 0)) * 100) + '%');
     r.li.classList.toggle('can', !!o.enabled);
     if (r.max) {
@@ -723,25 +752,40 @@
   }
 
   /* Кнопка с ценой: доступность, полоска накопления и «через сколько» */
-  function payer() {
+  /* mark: цены вкладки «Покупки», на них действует скидка за рекламу (метка на кнопке, цена уже со скидкой) */
+  function payer(mark) {
     const s = S, open = s.status === 'playing' && !s.fork && !s.traitOptions, ev = C.expected(s);
     return (cost) => {
       const ok = open && cost != null && s.money >= cost;
       const wait = cost != null && s.money < cost && ev > 0 ? Math.ceil((cost - s.money) / ev) : null;
-      return { price: money(cost), enabled: ok, progress: cost ? s.money / cost : 0, hint: wait != null && wait <= 600 ? `через ${span(wait)}` : (s.money < 0 ? 'сначала закрой долг' : '') };
+      return { price: money(cost), sale: mark && s.sale && cost != null ? `−${Math.round(C.SALE_CUT * 100)}%` : '', enabled: ok, progress: cost ? s.money / cost : 0, hint: wait != null && wait <= 600 ? `через ${span(wait)}` : (s.money < 0 ? 'сначала закрой долг' : '') };
     };
   }
 
   function renderShop() {
     const s = S;
     const open = s.status === 'playing' && !s.fork && !s.traitOptions;
-    const pay = payer();
+    const pay = payer(true);
 
+    /* Бонусы за рекламу: строки всегда на месте, недоступный бонус честно подписан на кнопке */
+    const head = `Бонусы · ${s.ads} из ${C.AD_LIMIT}`;
+    if ($('adsHead').textContent !== head) $('adsHead').textContent = head;
+    const capped = C.adsLeft(s) === 0;
+    const watch = { verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true };
+    const limit = { verb: 'Лимит', price: 'на жизнь', done: true, progress: 0 };
+    const rest = (at, len) => ({ verb: 'Отдых', price: open ? `ещё ${Math.max(0, at - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, at - s.month) / len : 0 });
     setRow(shopRows.boost, s.boost > 0
       ? { title: 'Удачный год идёт', desc: 'Зарплата, пассив и деньги хороших событий вдвое.', verb: 'Идёт', price: `ещё ${s.boost} мес.`, done: true, progress: 1 }
-      : C.boostReady(s)
-        ? { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true }
-        : { title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое`, verb: 'Отдых', price: open ? `ещё ${Math.max(0, s.boostAt - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, s.boostAt - s.month) / C.BOOST_REST : 0 });
+      : Object.assign({ title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое` }, C.boostReady(s) ? watch : capped ? limit : rest(s.boostAt, C.BOOST_REST)));
+    setRow(shopRows['ad-star'], Object.assign({ title: 'Зарядить звезду', desc: '«Свой месяц» готов сразу, без пустых месяцев' }, C.starReady(s) ? watch
+      : capped ? limit
+      : s.charge >= C.chargeMax(s) ? { verb: 'Заряжена', price: 'уже', done: true, progress: 1 }
+      : rest(s.starAt, C.STAR_REST)));
+    const cut = Math.round(C.SALE_CUT * 100);
+    setRow(shopRows['ad-sale'], s.sale
+      ? { title: `Скидка ${cut}% включена`, desc: 'Цены ниже уже со скидкой. Она уйдёт только с покупкой', verb: 'Ждёт', price: 'покупки', done: true, progress: 1 }
+      : Object.assign({ title: `Скидка ${cut}%`, desc: 'Следующая покупка в этой вкладке дешевле. Должность и так бесплатная' },
+        C.saleReady(s) ? watch : capped ? limit : rest(s.saleAt, C.SALE_REST)));
 
     const nj = C.nextJob(s);
     if (nj) {
@@ -760,13 +804,13 @@
     const less = hf === 0 ? ' <span class="warn">Зарплаты нет: здоровье на нуле.</span>' : hf < 1 ? ` <span class="warn">Зарплата урезана на ${Math.round((1 - hf) * 100)}%.</span>` : '';
     setRow(shopRows.gym, full
       ? { title: 'Спортзал', desc: 'Здоровье полное, качаться незачем.', verb: 'Здоров', price: '100 из 100', enabled: false, done: true, progress: 0 }
-      : Object.assign({ title: 'Спортзал', desc: '+20 здоровья.' + less, verb: 'Сходить' }, pay(C.gymCost(s))));
+      : Object.assign({ title: 'Спортзал', desc: '+20 здоровья.' + less, verb: 'Сходить' }, pay(C.costOf(s, 'gym'))));
 
-    const hc = C.homeCost(s);
+    const hc = C.costOf(s, 'home');
     if (hc != null) setRow(shopRows.home, Object.assign({ title: C.HOMES[s.home + 1].name, desc: '+6% к зарплате, здоровье тратится медленнее', verb: 'Переехать' }, pay(hc)));
     else setRow(shopRows.home, { title: 'Вилла у моря', desc: 'Жильё: лучше уже некуда.', verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
 
-    const ac = C.assetCost(s);
+    const ac = C.costOf(s, 'asset');
     if (ac != null) {
       const inc = C.assetIncome(s, s.assets);
       const late = Math.ceil(ac / inc) > C.monthsLeft(s);
@@ -777,7 +821,7 @@
       }, pay(ac)));
     } else setRow(shopRows.asset, { title: 'Все инвестиции', desc: `Портфель приносит ${money(C.passive(s))} в месяц.`, verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
 
-    if (!s.reels4) setRow(shopRows.reel, Object.assign({ title: 'Четвёртый барабан', desc: 'Больше совпадений: две пары сразу и каре', verb: 'Поставить' }, pay(C.reelCost(s))));
+    if (!s.reels4) setRow(shopRows.reel, Object.assign({ title: 'Четвёртый барабан', desc: 'Больше совпадений: две пары сразу и каре', verb: 'Поставить' }, pay(C.costOf(s, 'reel'))));
     else setRow(shopRows.reel, { title: 'Четвёртый барабан', desc: `Стоит. Событие дают ${pf.format(C.odds(s).any * 100)}% спинов.`, verb: 'Куплено', price: 'стоит', done: true, progress: 1 });
 
     /* улучшения слота: уровни по порядку, шансы множителя видны до покупки */
@@ -789,13 +833,14 @@
       coach: (lvl, max) => (lvl < max ? 'Символы получают вдвое больше опыта и быстрее растут в уровне.' : 'Символы получают вдвое больше опыта.'),
     };
     C.UP_IDS.forEach((id) => {
-      const lvl = s.up[id], max = C.UPGRADES[id].costs.length, cost = C.upCost(s, id);
+      const lvl = s.up[id], max = C.UPGRADES[id].costs.length, cost = C.costOf(s, 'up:' + id);
       const title = C.UPGRADES[id].name + (max > 1 && lvl ? `, уровень ${lvl} из ${max}` : '');
       if (cost != null) setRow(shopRows['up-' + id], Object.assign({ title, desc: UP_TEXT[id](lvl, max), verb: lvl ? 'Улучшить' : 'Купить' }, pay(cost)));
       else setRow(shopRows['up-' + id], { title, desc: UP_TEXT[id](lvl, max), verb: 'Куплено', price: 'максимум', done: true, progress: 1 });
     });
 
-    const ready = Object.keys(shopRows).filter((k) => !shopRows[k].b.disabled).length;
+    /* на значке только покупки: бонусы за рекламу о себе не напоминают */
+    const ready = Object.keys(shopRows).filter((k) => !AD_ROWS.includes(k) && !shopRows[k].b.disabled).length;
     const badge = $('shopBadge');
     badge.dataset.empty = ready === 0 ? '1' : '0';
     badge.textContent = ready || '0';
@@ -1184,11 +1229,30 @@
     clearTimeout(timer);
     $('traitIcon').src = ICON.star;
     $('traitKind').textContent = `Жизнь ${S.life}: новая попытка`;
-    $('traitOpts').innerHTML = S.traitOptions.map((id) =>
-      `<button class="opt" type="button" data-trait="${id}"><img src="${ICON[TRAIT_ICON[id]]}" alt=""><b>${esc(C.TRAITS[id].name)}</b><span>${esc(C.TRAITS[id].note)}</span></button>`).join('');
+    renderTraits();
     $('traitLay').hidden = false;
     openedAt = Date.now();
     $('traitBox').focus();
+  }
+  function renderTraits() {
+    $('traitOpts').innerHTML = S.traitOptions.map((id) =>
+      `<button class="opt" type="button" data-trait="${id}"><img src="${ICON[TRAIT_ICON[id]]}" alt=""><b>${esc(C.TRAITS[id].name)}</b><span>${esc(C.TRAITS[id].note)}</span></button>`).join('');
+    /* «Четвёртая черта»: раз за жизнь; после неё или когда показывать нечего, кнопки нет */
+    const more = $('traitMore');
+    more.hidden = S.trait4 || !C.TRAIT_IDS.some((id) => !S.traitOptions.includes(id));
+    more.disabled = !C.traitMore(S);
+    more.firstElementChild.textContent = ownsNoAds() ? 'Без рекламы' : 'За рекламу';
+    more.lastElementChild.textContent = more.disabled ? 'Лимит бонусов на эту жизнь исчерпан' : 'Ещё один вариант из тех же черт. Один раз за жизнь';
+  }
+  function moreTrait() {
+    if (!traitOpen || adOpen || !C.traitMore(S) || Date.now() - openedAt < GUARD) return;
+    withAd(() => {
+      if (!traitOpen || !C.extraTrait(S)) return;
+      renderTraits();
+      openedAt = Date.now();
+      save();
+      $('traitBox').focus();
+    });
   }
   function chooseTrait(id) {
     if (!traitOpen || Date.now() - openedAt < GUARD) return;
@@ -1277,6 +1341,7 @@
     buy((b.classList.contains('max-btn') || sym === 'bill' ? 'cut:' : 'add:') + sym, li);
   });
   $('traitOpts').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chooseTrait(b.dataset.trait); });
+  $('traitMore').addEventListener('click', moreTrait);
   $('modalBtn').addEventListener('click', () => closeModal(false));
   $('modalAlt').addEventListener('click', () => closeModal(true));
   $('nextBtn').addEventListener('click', () => { if (S.status !== 'playing' && !modalOpen) newLife(); });

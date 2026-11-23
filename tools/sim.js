@@ -105,49 +105,69 @@ const policies = {
   },
 };
 
-/* те же игроки, но вместо обычного «да» всегда берут золотой вариант */
+/* те же игроки, но смотрят рекламу: вместо обычного «да» берут золотой вариант, берут «Удачный год»,
+   заряд звезды, скидку и четвёртую черту. casual+ad жмёт всё, что готово, пока не кончится лимит;
+   smart+ad (adPlan) сначала оставляет в лимите место под «Удачные годы» до ожидаемого миллиона. */
 policies['casual+ad'] = Object.assign({}, policies.casual, { ads: true });
-policies['smart+ad'] = Object.assign({}, policies.smart, { ads: true });
+policies['smart+ad'] = Object.assign({}, policies.smart, { ads: true, adPlan: true });
 /* берёт золотой вариант в каждой развилке, где он есть */
 policies.allgold = Object.assign({}, policies.smart, { ads: true, fork: () => 0 });
 
 const PERK_SETS = { 0: {}, 1: { genes: 2, cash: 2, school: 1, tough: 1, sale: 1, ties: 1 }, 2: { cash: 4, genes: 5, tough: 3, ties: 3, school: 3, sale: 3, star: 1, traits: 2, joker: 1 } };
 const STAY = !!process.env.STAY;
+/* Можно ли потратить один бонус из лимита не на «Удачный год». У adPlan в лимите остаётся место
+   под все «Удачные годы» до ожидаемого миллиона (грубо: долг до цели / средний доход в месяц). */
+function spare(p, s) {
+  if (!p.adPlan) return true;
+  const est = s.wonAt != null ? 0 : Math.min(Core.monthsLeft(s), (Core.GOAL - s.money) / Math.max(1, Core.expected(s)));
+  const wait = Math.max(0, s.boostAt - s.month), cycle = Core.BOOST_LEN + Core.BOOST_REST;
+  const need = s.boost > 0 || est <= wait ? (s.boost > 0 && est > wait ? 1 + Math.floor((est - wait) / cycle) : 0) : 1 + Math.floor((est - wait) / cycle);
+  return Core.adsLeft(s) - 1 >= need;
+}
+/* реклама до хода: «Удачный год» первым, потом скидка (покупки этого хода уже со скидкой) и звезда */
+function adTurn(p, s) {
+  if (!p.ads || process.env.ADS_OLD) return;
+  if (Core.boostReady(s)) Core.startBoost(s);
+  if (Core.saleReady(s) && spare(p, s)) Core.startSale(s);
+  if (Core.starReady(s) && p.charge && spare(p, s)) Core.chargeStar(s);
+}
 function run(name, legacy, seed, life) {
   const rng = mulberry(seed), p = policies[name];
   const s = Core.newState(PERK_SETS[legacy], life || 1, rng);
+  if (s.traitOptions && p.ads && !process.env.ADS_OLD) Core.extraTrait(s, rng);
   if (s.traitOptions) Core.pickTrait(s, p.trait ? p.trait(s.traitOptions) : s.traitOptions[0]);
   let forks = 0, charges = 0;
   while (s.status === 'playing') {
     if (s.wonAt != null && !STAY) { Core.retire(s); break; }
+    adTurn(p, s);
     p.turn(s);
     if (p.ads && Core.boostReady(s)) Core.startBoost(s);
     const pick = p.charge && Core.canCharge(s) ? p.charge(s) : null;
     if (pick) charges++;
     Core.spin(s, rng, p.auto ? { auto: true } : pick ? { charged: pick } : null);
-    if (s.fork) { forks++; const f = Core.fork(s), c = p.fork(s, f); if (!Core.choose(s, p.ads && c === 0 && f.gold && f.gold.enabled ? 'gold' : c, rng)) Core.choose(s, 1, rng); }
+    if (s.fork) { forks++; const f = Core.fork(s), c = p.fork(s, f); if (!Core.choose(s, p.ads && c === 0 && f.gold && f.gold.enabled && spare(p, s) ? 'gold' : c, rng)) Core.choose(s, 1, rng); }
   }
   s._forks = forks; s._charges = charges;
   return s;
 }
 
 function report(name, legacy, life, n = +process.env.N || 600) {
-  let wins = 0; const ages = [], finals = [], jobs = [], decks = [], peaks = []; let forks = 0, charges = 0, reel = 0; const goals = {};
+  let wins = 0; const ages = [], finals = [], jobs = [], decks = [], peaks = [], ads = []; let forks = 0, charges = 0, reel = 0, capped = 0; const goals = {};
   for (let i = 0; i < n; i++) {
     const s = run(name, legacy, 1000 + i, life);
-    forks += s._forks; charges += s._charges; reel += s.reels4 ? 1 : 0;
+    forks += s._forks; charges += s._charges; reel += s.reels4 ? 1 : 0; ads.push(s.ads); if (s.ads >= Core.AD_LIMIT) capped++;
     if (s.wonAt != null) { wins++; ages.push(Core.START_AGE + s.wonAt / Core.YEAR); } else finals.push(s.money);
     peaks.push(s.peak);
     jobs.push(s.job); decks.push(Core.deckSize(s));
     Core.goalsMet(s).forEach((g) => { goals[g] = (goals[g] || 0) + 1; });
   }
   const sort = (a) => a.sort((x, y) => x - y);
-  sort(ages); sort(finals); sort(jobs); sort(decks); sort(peaks);
+  sort(ages); sort(finals); sort(jobs); sort(decks); sort(peaks); sort(ads);
   const q = (a, p) => (a.length ? a[Math.floor((a.length - 1) * p)] : NaN);
   console.log(
     `${name.padEnd(9)} наследие=${legacy}  побед ${(100 * wins / n).toFixed(0).padStart(3)}%` +
     `  миллион p10/med/p90: ${q(ages, 0.1).toFixed(0)}/${q(ages, 0.5).toFixed(0)}/${q(ages, 0.9).toFixed(0)}` +
-    `  проигравшие med: $${Math.round(q(finals, 0.5))}  должность: ${q(jobs, 0.5)}  развилок: ${(forks / n).toFixed(1)}  звёзд: ${(charges / n).toFixed(1)}  колода: ${q(decks, 0.5)}` + (STAY ? `  к 65: med $${(q(peaks, 0.5) / 1e6).toFixed(1)} млн, $5M ${Math.round(100 * peaks.filter((x) => x >= 5e6).length / n)}%, $25M ${Math.round(100 * peaks.filter((x) => x >= 2.5e7).length / n)}%, $100M ${Math.round(100 * peaks.filter((x) => x >= 1e8).length / n)}%` : '')
+    `  проигравшие med: $${Math.round(q(finals, 0.5))}  должность: ${q(jobs, 0.5)}  развилок: ${(forks / n).toFixed(1)}  звёзд: ${(charges / n).toFixed(1)}  колода: ${q(decks, 0.5)}` + (policies[name].ads ? `  реклама med/max: ${q(ads, 0.5)}/${q(ads, 1)}, упёрлись в лимит ${Math.round(100 * capped / n)}%` : '') + (STAY ? `  к 65: med $${(q(peaks, 0.5) / 1e6).toFixed(1)} млн, $5M ${Math.round(100 * peaks.filter((x) => x >= 5e6).length / n)}%, $25M ${Math.round(100 * peaks.filter((x) => x >= 2.5e7).length / n)}%, $100M ${Math.round(100 * peaks.filter((x) => x >= 1e8).length / n)}%` : '')
   );
   return goals;
 }
@@ -196,7 +216,7 @@ if (!process.env.ONLY) {
   const never = Core.FORK_IDS.filter((id) => !seen[id]);
   console.log(`развилок всего ${Core.FORK_IDS.length}, недоступных ни разу: ${never.length ? never.join(', ') : 'нет'}`);
 }
-for (const p of (process.env.ONLY ? [process.env.ONLY] : ['afk', 'lazy', 'nofocus', 'casual', 'smart', 'casual+ad', 'smart+ad', 'allgold'])) for (const [l, life] of p === 'afk' ? [[0, 1]] : (process.env.L ? [[+process.env.L, 2]] : [[0, 1], [1, 2], [2, 2]])) {
+for (const p of (process.env.ONLY ? [process.env.ONLY] : ['afk', 'lazy', 'nofocus', 'casual', 'smart', 'casual+ad', 'smart+ad', 'allgold'])) for (const [l, life] of p === 'afk' ? [[0, 1]] : (process.env.L ? [[+process.env.L, +process.env.LIFE || 2]] : [[0, 1], [1, 2], [2, 2]])) {
   const g = report(p, l, life);
   if (process.argv.includes('--goals') && (p === 'casual' || p === 'smart') && life === 1) console.log('   цели, % жизней:', Core.GOALS.map((x) => `${x.id} ${Math.round((g[x.id] || 0) / 6)}`).join('  '));
 }
