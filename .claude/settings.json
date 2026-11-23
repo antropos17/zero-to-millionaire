@@ -1,0 +1,22 @@
+{
+  "enabledPlugins": {
+    "marketing@synced": false,
+    "product-management@synced": false,
+    "engineering@synced": false,
+    "fastly-agent-toolkit@synced": false,
+    "unity@synced": false,
+    "unity@inline": false,
+    "astra-lyrics@synced": false,
+    "astra-lyrics@inline": false,
+    "capcut-astra@synced": false,
+    "capcut-astra@inline": false,
+    "suno-nur@synced": false,
+    "suno-nur@inline": false,
+    "seedance-clean@synced": false,
+    "seedance-clean@inline": false,
+    "genjutsu-recast@synced": false,
+    "genjutsu-recast@inline": false,
+    "gpt-image-2-realism@synced": false,
+    "gpt-image-2-realism@inline": false
+  }
+}
