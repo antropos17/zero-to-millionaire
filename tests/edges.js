@@ -263,6 +263,28 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     && (await p.evaluate(() => document.querySelector('#home > g').innerHTML !== Art.home(window.z2m.state().home) && document.documentElement.dataset.theme === 'bill' && /#6B3F22/.test(document.getElementById('charBody').innerHTML))), JSON.stringify(afterNew.look));
   await p.close();
 
+  /* Возврат во вкладку при открытом окне автопокупок: «Пока тебя не было» не открывается поверх, догоняет после «Готово» */
+  p = await open(null, mut((c) => { c.M = Object.assign({ seenHelp: true, auto: true }, { owned: ['autobuy'] }); c.t = Date.now(); c.S.fork = null; c.S.traitOptions = null; }));
+  await p.click('#menuPlay'); await p.waitForTimeout(400);
+  if (await p.locator('#overlay').isVisible()) await p.click('#modalBtn');
+  await p.click('#tabBtn-shop'); await p.click('#autoEdit'); await p.waitForTimeout(200);
+  const m1 = (await st(p)).month;
+  await p.evaluate(() => {
+    let hid = true; const t0 = Date.now(); let shift = 0;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hid });
+    const real = Date.now; Date.now = () => real() + shift;
+    document.dispatchEvent(new Event('visibilitychange'));
+    shift = 5 * 60000; hid = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+    void t0;
+  });
+  await p.waitForTimeout(300);
+  const over = { auto: await p.locator('#autoLay').isVisible(), modal: await p.locator('#overlay').isVisible(), month: (await st(p)).month - m1 };
+  await p.click('#autoClose'); await p.waitForTimeout(300);
+  const after = { modal: await p.locator('#overlay').isVisible(), title: await p.evaluate(() => document.getElementById('overlay').textContent.includes('Пока тебя не было')), month: (await st(p)).month - m1 };
+  ok('окно автопокупок и возврат во вкладку: «Пока тебя не было» ждёт «Готово»', over.auto && !over.modal && over.month === 0 && after.modal && after.title && after.month === 5, JSON.stringify({ over, after }));
+  await p.close();
+
   /* 9. Магазин открыт во время спина, который открывает развилку: развилка ждёт, окна под магазином нет */
   p = await open();
   await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn'); await p.click('#autoBtn');
