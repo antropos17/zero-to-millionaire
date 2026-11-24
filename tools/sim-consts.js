@@ -19,7 +19,12 @@
    JPAY=<k>             оклад должности i меньше на k·i/9 (кривая зарплат положе сверху)
    FORKLOSS=<×>         денежные потери в развилках больше во столько раз
    Правки другой ветки (balance-proposals): HF0=<множитель при здоровье 0>, STUDY0=<карт Учёбы>,
-   GOLDL=<удача золота>, BOOSTR=<отдых Удачного года>; THEIRS=1 — все четыре сразу (0.25, 4, 35, 36). */
+   GOLDL=<удача золота>, BOOSTR=<отдых Удачного года>; THEIRS=1 — все четыре сразу (0.25, 4, 35, 36).
+   Ослабление рекламы: BOOSTLEN=<месяцев Удачного года> (сейчас 12), BOOSTK=<множитель доходов> (сейчас 2).
+   STAR0=<месяц> — первая «Зарядить звезду» доступна не раньше этого месяца жизни (сейчас 0).
+   ADOFF=boost,sale,star,trait — бот не видит эти рекламные бонусы (раздельный вклад каждого).
+   Стартовые деньги сценариев: SCMONEY=loan:-6000,flat:-3000,late:15000 (сейчас -12000, -12000, 15000).
+   SCSET=flat.skill:60,loan.health:70 — любое число сценария (age, money, skill, health, network, home, job). */
 const fs = require('fs'), path = require('path'), Module = require('module');
 const W = path.join(__dirname, '..');
 const file = path.join(W, 'src', 'core.js');
@@ -31,6 +36,8 @@ sub(/const AD_LIMIT = \d+;/, E.AD && `const AD_LIMIT = ${E.AD};`);
 sub(/const STAR_REST = \d+;/, E.STARR && `const STAR_REST = ${E.STARR};`);
 sub(/const SALE_CUT = [\d.]+, SALE_REST = \d+;/, (E.SALEC || E.SALER) && `const SALE_CUT = ${E.SALEC || 0.2}, SALE_REST = ${E.SALER || 24};`);
 
+sub(/ads: 0, starAt: 0,/, E.STAR0 && `ads: 0, starAt: ${+E.STAR0},`);
+sub(/s\.starAt = 0; s\.saleAt = 0;/, E.STAR0 && `s.starAt = ${+E.STAR0}; s.saleAt = 0;`);
 /* рычаги трудности */
 const nums = (v) => v.split(',').map(Number);
 sub(/const END_AGE = \d+;/, E.END && `const END_AGE = ${+E.END};`);
@@ -45,7 +52,8 @@ if (E.HF || E.HF0) {
     `if (s.health <= 0) return ${z};\n    if (s.health < 25) return ${a};\n    if (s.health < 50) return ${b};`);
 }
 sub(/const GOLD_LUCK = \d+;/, E.GOLDL && `const GOLD_LUCK = ${+E.GOLDL};`);
-sub(/BOOST_LEN = 12, BOOST_REST = \d+;/, E.BOOSTR && `BOOST_LEN = 12, BOOST_REST = ${+E.BOOSTR};`);
+sub(/BOOST_LEN = 12, BOOST_REST = \d+;/, (E.BOOSTR || E.BOOSTLEN) && `BOOST_LEN = ${+E.BOOSTLEN || 12}, BOOST_REST = ${+E.BOOSTR || 36};`);
+sub(/const k = s\.boost > 0 \? 2 : 1;/, E.BOOSTK && `const k = s.boost > 0 ? ${+E.BOOSTK} : 1;`);
 if (E.UPKH || E.UPKJ || E.INFL || E.CRASH) {
   /* расходы в месяц и обвал рынка вставляются в resolve: там, где приходят зарплата и доход активов */
   const [cp, cl, cd] = E.CRASH ? nums(E.CRASH) : [0, 0, 0];
@@ -63,8 +71,15 @@ require.cache[file] = m;
 /* таблицы должностей меняются уже в загруженном модуле: Core.JOBS — те же объекты */
 const Core = m.exports;
 if (E.JSK) Core.JOBS.forEach((j, i) => { j.skill = Math.round(j.skill * (1 + +E.JSK * i / 9)); });
+if (E.SCMONEY) E.SCMONEY.split(',').forEach((kv) => { const [id, v] = kv.split(':'); if (!Core.SCENARIOS[id]) throw new Error('нет сценария ' + id); Core.SCENARIOS[id].money = +v; });
+if (E.SCSET) E.SCSET.split(',').forEach((kv) => { const [k, v] = kv.split(':'), [id, f] = k.split('.'); if (!Core.SCENARIOS[id] || !(f in Core.SCENARIOS[id])) throw new Error('нет ' + k); Core.SCENARIOS[id][f] = +v; });
+if (E.ADOFF) for (const a of E.ADOFF.split(',')) {
+  const f = { boost: 'boostReady', sale: 'saleReady', star: 'starReady', trait: 'extraTrait' }[a];
+  if (!f || !Core[f]) throw new Error('нет бонуса ' + a);
+  Core[f] = () => false;
+}
 if (E.JPAY) Core.JOBS.forEach((j, i) => { j.pay = Math.round(j.pay * (1 - +E.JPAY * i / 9)); });
 console.log(`# AD=${E.AD || '-'} STARR=${E.STARR || '-'} SALEC=${E.SALEC || '-'} SALER=${E.SALER || '-'} (- = как в core.js)`);
-const LEVERS = ['END', 'BILLN', 'BILLP', 'HD', 'GYM', 'HF', 'UPKH', 'UPKJ', 'INFL', 'CRASH', 'JSK', 'JPAY', 'FORKLOSS', 'HF0', 'STUDY0', 'GOLDL', 'BOOSTR'].filter((k) => E[k]);
+const LEVERS = ['END', 'BILLN', 'BILLP', 'HD', 'GYM', 'HF', 'UPKH', 'UPKJ', 'INFL', 'CRASH', 'JSK', 'JPAY', 'FORKLOSS', 'HF0', 'STUDY0', 'GOLDL', 'BOOSTR', 'BOOSTLEN', 'BOOSTK', 'SCMONEY', 'ADOFF', 'STAR0', 'SCSET'].filter((k) => E[k]);
 if (LEVERS.length) console.log('# рычаги: ' + LEVERS.map((k) => `${k}=${E[k]}`).join(' '));
 require(path.join(W, 'tools', 'sim-variant.js'));
