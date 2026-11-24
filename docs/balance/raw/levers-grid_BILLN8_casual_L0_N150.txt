@@ -1,0 +1,6 @@
+# AD=- STARR=- SALEC=- SALER=- (- = как в core.js)
+# рычаги: BILLN=8
+casual    наследие=0  побед 100%  миллион p10/med/p90: 48/51/54  проигравшие med: $NaN  должность: 6  развилок: 15.0  звёзд: 14.6  колода: 49
+   проигравшие к концу p10/med/p90: NaN/NaN/NaN  (0 жизней)
+   в 40 лет, медианы  выигравшие: money 41287 job 5 skill 223 health 51 net 12 home 3 assets 4 reel4 0% mult 1 study 9 bill 6 deck 42 low 100% debt 11% yes 2
+   в 40 лет, медианы проигравшие: money - job - skill - health - net - home - assets - reel4 - mult - study - bill - deck - low - debt - yes -
