@@ -1460,7 +1460,7 @@ const Core = (() => {
   /* цели «миллион без …» считаются по снимку в момент миллиона; до него смотрим, не сорвана ли цель уже сейчас */
   const atWin = (id, name, okWon, brokenNow) => ({ id, name, test: (s) => !!s.won && okWon(s.won), lost: (s) => (s.won ? !okWon(s.won) : brokenNow(s)) });
   const GOALS = [
-    byAge('m50', 50), byAge('m40', 40, ' (с наследием)'), byAge('m35', 35, ' (с наследием)'), byAge('m30', 30),
+    byAge('m50', 50), byAge('m40', 40, ' (с наследием)'), byAge('m35', 35, ' (с наследием)'), byAge('m30', 30, ' (с наследием)'),
     atWin('noreel', 'Миллион без четвёртого барабана', (w) => !w.reels4, (s) => s.reels4),
     atWin('noinvest', 'Миллион без единой инвестиции', (w) => w.assets === 0, (s) => s.assets > 0),
     atWin('nodebt', 'Миллион, ни разу не уйдя в минус', (w) => !w.debt, (s) => s.flags.debt),
