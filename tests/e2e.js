@@ -355,7 +355,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await force(p, [0.1, 0.5, 0.6]);
   await p.click('#spinBtn'); await p.click('#spinBtn'); await p.waitForTimeout(150);
   s = await st(p);
-  ok('после рекламы 12 месяцев доход вдвое, потом 24 месяца отдыха', bs.boost === 12 && bs.at === bs.month + 36 && s.money - bs.money === 2 * (bs.sal + bs.pas) && s.boost === 11 && /доходы ×2/.test(await p.textContent('#goalText')) && await p.locator('li[data-kind="boost"] .btn-buy').isDisabled(), JSON.stringify({ d: s.money - bs.money, sal: bs.sal, boost: s.boost }));
+  ok('после рекламы 12 месяцев доход вдвое, потом 36 месяцев отдыха', bs.boost === 12 && bs.at === bs.month + 48 && s.money - bs.money === 2 * (bs.sal + bs.pas) && s.boost === 11 && /доходы ×2/.test(await p.textContent('#goalText')) && await p.locator('li[data-kind="boost"] .btn-buy').isDisabled(), JSON.stringify({ d: s.money - bs.money, sal: bs.sal, boost: s.boost }));
   await p.evaluate(() => { const s = window.z2m.state(); s.fork = null; s.charge = 0; s.boost = 0; window.z2m.adMs = null; window.z2m.refresh(); document.getElementById('autoBtn').click(); });
 
   /* 6. Сохранение и офлайн */
