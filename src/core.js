@@ -8,7 +8,7 @@ const Core = (() => {
 
   /* Колода: сколько карт каждого символа лежит на барабанах. Шанс символа = его карты / все карты. */
   const SYMBOLS = ['work', 'study', 'health', 'network', 'chance', 'coin', 'bill', 'wild'];
-  const START_DECK = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+  const START_DECK = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
   const FOCI = ['work', 'study', 'health', 'network'];
   const BUYABLE = ['study', 'health', 'network', 'chance'];
   const CARD_BASE = { study: 300, health: 300, network: 400, chance: 500 };
@@ -29,7 +29,7 @@ const Core = (() => {
   const SET_BY = {};
   SETS.forEach((t) => { SET_BY[t.id] = t; });
   /* «Удачный год» за рекламу: столько месяцев все доходы вдвое, потом столько же месяцев отдыха */
-  const BOOST_LEN = 12, BOOST_REST = 24;
+  const BOOST_LEN = 12, BOOST_REST = 36;
   /* Рекламные бонусы: не больше AD_LIMIT за жизнь. В счёт идут золотые варианты, «Удачный год»,
      заряд звезды, скидка и четвёртая черта. Удвоение за время отсутствия в счёт не идёт. */
   const AD_LIMIT = 16;
@@ -417,7 +417,7 @@ const Core = (() => {
   }
 
   function healthFactor(s) {
-    if (s.health <= 0) return 0;
+    if (s.health <= 0) return 0.25;
     if (s.health < 25) return 0.5;
     if (s.health < 50) return 0.75;
     return 1;

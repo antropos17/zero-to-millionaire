@@ -931,7 +931,7 @@
     } else setRow(shopRows.job, { title: 'Вершина карьеры', desc: 'Выше только свой единорог, а он у тебя уже есть.', verb: 'Потолок', price: 'карьеры', done: true, progress: 1 });
 
     const hf = C.healthFactor(s), full = s.health >= 100;
-    const less = hf === 0 ? ' <span class="warn">Зарплаты нет: здоровье на нуле.</span>' : hf < 1 ? ` <span class="warn">Зарплата урезана на ${Math.round((1 - hf) * 100)}%.</span>` : '';
+    const less = hf < 1 ? ` <span class="warn">Зарплата урезана на ${Math.round((1 - hf) * 100)}%.</span>` : '';
     setRow(shopRows.gym, full
       ? { title: 'Спортзал', desc: 'Здоровье полное, качаться незачем.', verb: 'Здоров', price: '100 из 100', enabled: false, done: true, progress: 0 }
       : Object.assign({ title: 'Спортзал', desc: '+20 здоровья.' + less, verb: 'Сходить' }, pay(C.costOf(s, 'gym'))));
