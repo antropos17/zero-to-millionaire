@@ -1,0 +1,4 @@
+casual    наследие=0  побед  67%  миллион p10/med/p90: 61/63/65  проигравшие med: $751483  должность: 4  развилок: 19.5  звёзд: 17.2  колода: 50
+   проигравшие к концу p10/med/p90: 460551/751483/957278  (199 жизней)
+   в 40 лет, медианы  выигравшие: money 23647 job 3 skill 216 health 50 net 12 home 3 assets 3 reel4 0% mult 1 study 10 bill 8 deck 40 low 100% debt 0% yes 1
+   в 40 лет, медианы проигравшие: money 22898 job 3 skill 194 health 51 net 12 home 3 assets 3 reel4 0% mult 1 study 10 bill 8 deck 40 low 100% debt 0% yes 1

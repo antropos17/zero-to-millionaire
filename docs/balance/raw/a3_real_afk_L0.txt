@@ -1,0 +1,4 @@
+afk       наследие=0  побед   0%  миллион p10/med/p90: NaN/NaN/NaN  проигравшие med: $50603  должность: 0  развилок: 0.0  звёзд: 0.0  колода: 31
+   проигравшие к концу p10/med/p90: 43249/50603/59154  (600 жизней)
+   в 40 лет, медианы  выигравшие: money - job - skill - health - net - home - assets - reel4 - mult - study - bill - deck - low - debt - yes -
+   в 40 лет, медианы проигравшие: money 20179 job 0 skill 17 health 0 net 9 home 0 assets 0 reel4 0% mult 0 study 4 bill 10 deck 30 low 100% debt 9% yes 0

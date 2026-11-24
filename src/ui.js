@@ -74,6 +74,8 @@
   /* \u2060 не даёт строке переноситься между минусом и суммой */
   const money = (n) => { const r = Math.round(n); return (r < 0 ? '−\u2060$' : '$') + nf.format(Math.abs(r)); };
   const signed = (n) => { const r = Math.round(n); return (r < 0 ? '−\u2060$' : '+\u2060$') + nf.format(Math.abs(r)); };
+  /* множитель «Удачного года» для подписей: 1.5 → «1,5» */
+  const boostK = () => String(C.BOOST_K).replace('.', ',');
   const short = (n) => {
     const a = Math.abs(n), sg = n < 0 ? '−' : '';
     if (a >= 1e6) return sg + '$' + pf.format(a / 1e6).replace(',0', '') + ' млн';
@@ -760,8 +762,8 @@
     withAd(() => {
       if (!C.startBoost(S)) { schedule(); return; }
       sfx.big(); charAct('jump'); confetti(20, false);
-      pushLog(`Удачный год: ${C.BOOST_LEN} месяцев все доходы вдвое`, null, 'star');
-      floatLabel('Доходы ×2', '');
+      pushLog(`Удачный год: ${C.BOOST_LEN} месяцев все доходы ×${boostK()}`, null, 'star');
+      floatLabel(`Доходы ×${boostK()}`, '');
       pulse(li, 'flash');
       render(); save(); schedule(300);
     });
@@ -903,13 +905,16 @@
     const capped = C.adsLeft(s) === 0;
     const watch = { verb: ownsNoAds() ? 'Забрать' : 'Смотреть', price: ownsNoAds() ? 'без ролика' : 'рекламу', enabled: true };
     const limit = { verb: 'Лимит', price: 'на жизнь', done: true, progress: 0 };
+    /* первая звезда — с STAR_FIRST месяца жизни: кнопка выключена, на ней возраст и сколько ждать */
+    const first = (at) => ({ verb: `С ${C.START_AGE + Math.floor(at / C.YEAR)} лет`, price: open ? `ещё ${at - s.month} мес.` : 'позже', done: true, progress: open ? s.month / at : 0 });
     const rest = (at, len) => ({ verb: 'Отдых', price: open ? `ещё ${Math.max(0, at - s.month)} мес.` : 'позже', done: true, progress: open ? 1 - Math.max(0, at - s.month) / len : 0 });
     setRow(shopRows.boost, s.boost > 0
-      ? { title: 'Удачный год идёт', desc: 'Зарплата, пассив и деньги хороших событий вдвое.', verb: 'Идёт', price: `ещё ${s.boost} мес.`, done: true, progress: 1 }
-      : Object.assign({ title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы вдвое` }, C.boostReady(s) ? watch : capped ? limit : rest(s.boostAt, C.BOOST_REST)));
+      ? { title: 'Удачный год идёт', desc: `Зарплата, пассив и деньги хороших событий ×${boostK()}.`, verb: 'Идёт', price: `ещё ${s.boost} мес.`, done: true, progress: 1 }
+      : Object.assign({ title: 'Удачный год', desc: `${C.BOOST_LEN} месяцев все доходы ×${boostK()}` }, C.boostReady(s) ? watch : capped ? limit : rest(s.boostAt, C.BOOST_REST)));
     setRow(shopRows['ad-star'], Object.assign({ title: 'Зарядить звезду', desc: '«Свой месяц» готов сразу, без пустых месяцев' }, C.starReady(s) ? watch
       : capped ? limit
       : s.charge >= C.chargeMax(s) ? { verb: 'Заряжена', price: 'уже', done: true, progress: 1 }
+      : s.starAt === C.STAR_FIRST && s.month < C.STAR_FIRST ? first(C.STAR_FIRST)
       : rest(s.starAt, C.STAR_REST)));
     const cut = Math.round(C.SALE_CUT * 100);
     setRow(shopRows['ad-sale'], s.sale
@@ -1146,7 +1151,7 @@
     $('lifePct').textContent = Math.floor(lp * 100) + '%';
     $('ageText').textContent = years(C.age(s));
     $('jobText').textContent = C.JOBS[s.job].name;
-    $('goalText').textContent = s.boost > 0 ? 'доходы ×2' : s.wonAt != null ? 'миллион есть, играешь до 65' : s.life > 1 ? `жизнь ${s.life}` : 'цель $1 000 000';
+    $('goalText').textContent = s.boost > 0 ? `доходы ×${boostK()}` : s.wonAt != null ? 'миллион есть, играешь до 65' : s.life > 1 ? `жизнь ${s.life}` : 'цель $1 000 000';
     $('goalText').classList.toggle('boost', s.boost > 0);
 
     const hf = C.healthFactor(s);

@@ -94,11 +94,12 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
     await p.click('#menuPlay'); await p.waitForTimeout(500);
     const s = await st(p);
     const pts = await p.textContent('#ptsLine');
-    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === Math.min(16, (S.flags && S.flags.gold) || 0) && s.sale === false && s.trait4 === false && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    ok(`сохранение ${name}: перенесено без потерь`, errors.length === before && s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === Math.min(8, (S.flags && S.flags.gold) || 0) && s.sale === false && s.trait4 === false && s.money === S.money && s.life === S.life && s.job === S.job && s.deck.wild === 0 && s.perks.genes === 0 && new RegExp('Жизнь ' + S.life).test(menu) && !(await junk(p)), JSON.stringify({ v: s.v, money: s.money, pts, err: errors.slice(before) }));
+    if (name === 'v8') ok('сохранение v9 со старым лимитом: счётчик рекламы 12 приводится к новому лимиту 8', await p.evaluate(() => Core.migrate({ v: 9, ads: 12 }).ads) === 8);
     if (name === 'v6' || name === 'v7' || name === 'v8') {
       const head = await p.textContent('#adsHead');
       const rows = await p.evaluate(() => ['boost', 'ad-star', 'ad-sale'].map((k) => document.querySelector(`li[data-kind="${k}"] .btn-buy`).textContent).join(' | '));
-      ok(`сохранение ${name}: черта, наследие и летопись на месте, бонусы считаются с уже взятого золота`, s.trait === 'frugal' && s.perks.sale === 1 && s.deck.work === 10 && (name === 'v6' ? s.story.length === 0 && s.boost === 0 : s.story.length === 2 && s.boost === 5 && s.boostAt === 180) && head === `Бонусы · ${S.flags.gold} из 16` && (name !== 'v6' ? /Идёт/.test(rows) : true), JSON.stringify({ head, rows, story: s.story.length }));
+      ok(`сохранение ${name}: черта, наследие и летопись на месте, бонусы считаются с уже взятого золота`, s.trait === 'frugal' && s.perks.sale === 1 && s.deck.work === 10 && (name === 'v6' ? s.story.length === 0 && s.boost === 0 : s.story.length === 2 && s.boost === 5 && s.boostAt === 180) && head === `Бонусы · ${S.flags.gold} из 8` && (name !== 'v6' ? /Идёт/.test(rows) : true), JSON.stringify({ head, rows, story: s.story.length }));
       /* скидка за рекламу перемножается с «Аскетом» и «Умением торговаться» */
       const c = await p.evaluate(() => { const t = JSON.parse(JSON.stringify(window.z2m.state())); const a = Core.costOf(t, 'home'); t.sale = true; return { a, b: Core.costOf(t, 'home'), list: Core.homeCost(t) }; });
       ok(`сохранение ${name}: скидка 20% поверх «Аскета» и перка`, c.a === Math.round(14000 * 0.85 * 0.95) && c.b === Math.round(c.a * 0.8) && c.list === c.a, JSON.stringify(c));
@@ -137,7 +138,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   const adShown = await p.locator('#adLay').isVisible();
   await p.waitForTimeout(2100);
   let s = await st(p);
-  ok('реклама досмотрена при открывшейся развилке: бонус выдан', adShown && s.boost === 12 && !!s.fork && await p.locator('#forkLay').isVisible(), JSON.stringify({ adShown, boost: s.boost, fork: s.fork }));
+  ok('реклама досмотрена при открывшейся развилке: бонус выдан', adShown && s.boost === 6 && !!s.fork && await p.locator('#forkLay').isVisible(), JSON.stringify({ adShown, boost: s.boost, fork: s.fork }));
   await p.waitForTimeout(400); await p.click('#forkB');
   await p.evaluate(() => { window.z2m.adMs = null; });
 
