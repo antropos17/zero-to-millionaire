@@ -8,7 +8,7 @@ const Core = (() => {
 
   /* Колода: сколько карт каждого символа лежит на барабанах. Шанс символа = его карты / все карты. */
   const SYMBOLS = ['work', 'study', 'health', 'network', 'chance', 'coin', 'bill', 'wild'];
-  const START_DECK = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+  const START_DECK = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
   const FOCI = ['work', 'study', 'health', 'network'];
   const BUYABLE = ['study', 'health', 'network', 'chance'];
   const CARD_BASE = { study: 300, health: 300, network: 400, chance: 500 };

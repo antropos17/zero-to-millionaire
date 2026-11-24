@@ -32,7 +32,7 @@ async function openGame(browser, file, errors, { reduced = false, sound = true }
   if (await p.evaluate(() => JSON.parse(localStorage.getItem('zero-to-millionaire-v2')).M.auto)) await p.click('#autoBtn');
   if (sound) await p.click('#soundBtn');
   await p.waitForTimeout(800);
-  const D0 = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+  const D0 = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
   p.fix = (patch) => p.evaluate((x) => { const s = window.z2m.state(); Object.assign(s, { deck: Object.assign({}, x.d), ms: 6, fork: null, focus: 'work' }, x.patch); window.z2m.refresh(); }, { d: D0, patch });
   p.force = (q) => p.evaluate((arr) => { const q = arr.slice(); const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); }, q);
   p.heard = () => p.evaluate(() => window.__sfxLog.splice(0));
@@ -148,7 +148,7 @@ async function openGame(browser, file, errors, { reduced = false, sound = true }
     await p.heard();
     if (!reduced) {
       await p.fix({ money: 500 });
-      await p.force([0.1, 0.5, 0.75]);
+      await p.force([0.1, 0.5, 0.8]);
       await p.heard();
       await p.click('#spinBtn'); await p.waitForTimeout(120); await p.click('#spinBtn');
       await p.waitForTimeout(900);

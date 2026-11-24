@@ -119,7 +119,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   ok('после миллиона прогноз считает до следующей ступени', /\$5 млн|к 65/.test(await p.textContent('#forecast')) && !/миллион в/.test(await p.textContent('#forecast')), await p.textContent('#forecast'));
 
   /* 4. Меню открыто во время спина, который открывает развилку */
-  await p.evaluate(() => { const s = window.z2m.state(); s.deck = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 }; s.ms = 6; s.focus = 'work'; s.lastForks = []; window.z2m.refresh(); });
+  await p.evaluate(() => { const s = window.z2m.state(); s.deck = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 }; s.ms = 6; s.focus = 'work'; s.lastForks = []; window.z2m.refresh(); });
   await force(p, [0.8, 0.8, 0.1]);
   await p.click('#spinBtn');
   await p.click('#menuBtn');
@@ -312,7 +312,7 @@ const ok = (name, cond, extra) => { if (cond) passed++; else { failed++; console
   /* 9. Магазин открыт во время спина, который открывает развилку: развилка ждёт, окна под магазином нет */
   p = await open();
   await p.click('#menuPlay'); await p.waitForTimeout(500); await p.click('#modalBtn'); await p.click('#autoBtn');
-  await p.evaluate(() => { const s = window.z2m.state(); s.deck = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 }; s.ms = 6; s.focus = 'work'; s.lastForks = []; s.month = 60; window.z2m.refresh(); });
+  await p.evaluate(() => { const s = window.z2m.state(); s.deck = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 }; s.ms = 6; s.focus = 'work'; s.lastForks = []; s.month = 60; window.z2m.refresh(); });
   await force(p, [0.8, 0.8, 0.1]);
   await p.click('#spinBtn');
   await p.click('#storeBtn');

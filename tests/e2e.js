@@ -30,8 +30,8 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, on);
   const st = (p) => p.evaluate(() => JSON.parse(JSON.stringify(window.z2m.state())));
   /* стартовая колода и все рубежи пройдены: пороги для подложенных случайных чисел не плывут.
-     При фокусе на работе: работа до .444, учёба до .556, здоровье до .667, связи до .741, шанс до .852, дальше счета */
-  const D0 = { work: 6, study: 3, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+     При фокусе на работе: работа до .429, учёба до .571, здоровье до .679, связи до .750, шанс до .857, дальше счета */
+  const D0 = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
   const fix = (p, patch) => p.evaluate((x) => { const s = window.z2m.state(); Object.assign(s, { deck: Object.assign({}, x.d), ms: 6, fork: null, focus: 'work' }, x.patch || {}); window.z2m.refresh(); }, { d: D0, patch });
   const force = (p, q) => p.evaluate((arr) => { const q = arr.slice(); const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); }, q);
   const meta = (p) => p.evaluate((k) => JSON.parse(localStorage.getItem(k)).M, KEY);
@@ -87,13 +87,13 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.waitForTimeout(1500);
   ok('пауза держится', (await st(p)).month === w2);
   await p.click('#speedBtn');
-  await p.evaluate(() => { const q = [0.1, 0.5, 0.75]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
+  await p.evaluate(() => { const q = [0.1, 0.5, 0.8]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
   await p.click('#spinBtn'); await p.waitForTimeout(1400);
   ok('ручной спин', (await st(p)).month === w2 + 1);
-  await p.evaluate(() => { const q = [0.1, 0.5, 0.75]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
+  await p.evaluate(() => { const q = [0.1, 0.5, 0.8]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
   await p.click('#spinBtn'); await p.click('#spinBtn'); await p.waitForTimeout(150);
   ok('второе нажатие досрочно завершает спин', (await st(p)).month === w2 + 2);
-  await p.evaluate(() => { document.activeElement.blur(); const q = [0.1, 0.5, 0.75]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
+  await p.evaluate(() => { document.activeElement.blur(); const q = [0.1, 0.5, 0.8]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
   await p.keyboard.press('Space'); await p.waitForTimeout(1400);
   ok('пробел крутит', (await st(p)).month === w2 + 3);
 
@@ -105,9 +105,9 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   const oddsText = await p.textContent('#odds');
   ok('в точных шансах учёба помечена фокусом', /Учёба \(в фокусе\)/.test(oddsText), oddsText.slice(0, 120));
   const oo = await p.evaluate(() => { const o = Core.odds(window.z2m.state()); return { sum: Core.SYMBOLS.reduce((a, k) => a + o[k].p, 0), study: o.study.p, total: o.total }; });
-  ok('карты учёбы в фокусе считаются дважды: 6 из 24', Math.abs(oo.sum - 1) < 1e-9 && oo.total === 24 && Math.abs(oo.study - 0.25) < 1e-9, JSON.stringify(oo));
-  ok('строка колоды показывает число карт и шанс', (await p.textContent('#deck li[data-kind="study"] h3')) === 'Учёба ×3 · 25,0%', await p.textContent('#deck li[data-kind="study"] h3'));
-  ok('в колоде 21 карта, на полоске 6 символов', (await p.textContent('#deckSize')) === 'В колоде 21 карта' && (await p.locator('#deckBar i').count()) === 6, await p.textContent('#deckSize'));
+  ok('карты учёбы в фокусе считаются дважды: 8 из 26', Math.abs(oo.sum - 1) < 1e-9 && oo.total === 26 && Math.abs(oo.study - 8 / 26) < 1e-9, JSON.stringify(oo));
+  ok('строка колоды показывает число карт и шанс', (await p.textContent('#deck li[data-kind="study"] h3')) === 'Учёба ×4 · 30,8%', await p.textContent('#deck li[data-kind="study"] h3'));
+  ok('в колоде 22 карты, на полоске 6 символов', (await p.textContent('#deckSize')) === 'В колоде 22 карты' && (await p.locator('#deckBar i').count()) === 6, await p.textContent('#deckSize'));
   await p.click('#tabBtn-log');
   ok('вкладка «Лента» открыта', await p.locator('#tab-log').isVisible() && !(await p.locator('#tab-shop').isVisible()));
 
@@ -121,12 +121,12 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await set(p, { money: 500 });
   await btn('study').click();
   s = await st(p);
-  ok('карта учёбы куплена за $300, следующая дороже', s.deck.study === 4 && s.money === 200 && s.bought.study === 1 && (await p.evaluate(() => Core.addCost(window.z2m.state(), 'study'))) === 525, JSON.stringify({ study: s.deck.study, money: s.money }));
+  ok('карта учёбы куплена за $300, следующая дороже', s.deck.study === 5 && s.money === 200 && s.bought.study === 1 && (await p.evaluate(() => Core.addCost(window.z2m.state(), 'study'))) === 525, JSON.stringify({ study: s.deck.study, money: s.money }));
   ok('ссылка «убрать» без денег выключена', await cutBtn('study').isVisible() && await cutBtn('study').isDisabled(), await cutBtn('study').textContent());
   await set(p, { money: 2000 });
   await cutBtn('study').click();
   s = await st(p);
-  ok('карта учёбы убрана за $250', s.deck.study === 3 && s.cut === 1 && s.money === 1750, JSON.stringify({ study: s.deck.study, money: s.money }));
+  ok('карта учёбы убрана за $250', s.deck.study === 4 && s.cut === 1 && s.money === 1750, JSON.stringify({ study: s.deck.study, money: s.money }));
   await btn('bill').click();
   s = await st(p);
   ok('карта счетов убрана за $1 500', s.deck.bill === 3 && s.billsCut === 1 && s.money === 250, JSON.stringify({ bill: s.deck.bill, money: s.money }));
@@ -148,7 +148,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('значок на вкладке считает доступные покупки', Number(await p.textContent('#shopBadge')) >= 3, await p.textContent('#shopBadge'));
   const groups = await p.evaluate(() => Array.from(document.querySelectorAll('#shop > h3.sub')).map((h) => h.textContent + ':' + Array.from(h.nextElementSibling.querySelectorAll('li')).map((li) => li.dataset.kind).join(',')).join(' | '));
   ok('покупки разложены по разделам в нужном порядке', groups === 'Бонусы · 0 из 16:boost,ad-star,ad-sale | Жизнь:job,gym,home | Капитал:asset | Слот:reel,up-mult,up-star,up-insure,up-coach', groups);
-  /* пара монет платит пассивный доход за 6 месяцев: работа до .4, учёба .5, здоровье .6, связи .667, шанс .767, монета .867 */
+  /* пара монет платит пассивный доход за 6 месяцев: работа до .387, учёба .516, здоровье .613, связи .677, шанс .774, монета .871 */
   await fix(p, { money: 100, assets: 1, deck: Object.assign({}, D0, { coin: 3 }) });
   const c0 = await p.evaluate(() => { const s = window.z2m.state(); return { money: s.money, sal: Core.salary(s), pas: Core.passive(s) }; });
   await force(p, [0.8, 0.8, 0.1]);
@@ -236,12 +236,12 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await fix(p, { charge: 8, reels4: false, xp: { work: 0, study: 0, health: 0, network: 0 } });
   ok('неполная звезда выключена и показывает заряд', await p.locator('#chargeBtn').isDisabled() && (await p.textContent('#chargeVal')) === '8/10');
   for (let i = 0; i < 2; i++) {
-    await p.evaluate(() => { const q = [0.1, 0.5, 0.75]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
+    await p.evaluate(() => { const q = [0.1, 0.5, 0.8]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
     await p.click('#spinBtn'); await p.click('#spinBtn'); await p.waitForTimeout(150);
   }
   s = await st(p);
   ok('два пустых месяца дозарядили звезду', s.charge === 10 && await p.locator('#chargeBtn').isEnabled(), 'заряд ' + s.charge);
-  await p.evaluate(() => { const q = [0.1, 0.5, 0.75]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
+  await p.evaluate(() => { const q = [0.1, 0.5, 0.8]; const r = Math.random; Math.random = () => (q.length ? q.shift() : r()); });
   await p.click('#spinBtn'); await p.click('#spinBtn'); await p.waitForTimeout(150);
   ok('полная звезда дальше не копится', (await st(p)).charge === 10);
   const skill0 = (await st(p)).skill, m0 = (await st(p)).month;
@@ -336,7 +336,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   await p.click('#tabBtn-deck');
   const setsText = await p.textContent('#sets');
   ok('во вкладке «Колода» шесть сетов с шансами', (await p.locator('#sets li').count()) === 6 && /Стажировка мечты\d+,\d\d%/.test(setsText), setsText.slice(0, 80));
-  /* с одним Джокером при фокусе на работе: учёба до .536, здоровье до .643, джокер от .964 */
+  /* с одним Джокером при фокусе на работе: учёба до .552, здоровье до .655, джокер от .966 */
   await fix(p, { money: 1000, deck: Object.assign({}, D0, { wild: 1 }) });
   const jk0 = await st(p);
   await force(p, [0.99, 0.5, 0.6]);
@@ -400,7 +400,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   ok('выбор черты возвращается после перезагрузки', await p.locator('#traitLay').isVisible() && (await p.locator('#traitOpts .opt[data-trait="scholar"]').count()) === 1);
   await p.waitForTimeout(450); await p.click('#traitOpts .opt[data-trait="scholar"]');
   s = await st(p);
-  ok('черта «Отличник» дала две карты учёбы', s.trait === 'scholar' && s.traitOptions === null && s.deck.study === 5 && !(await p.locator('#traitLay').isVisible()), JSON.stringify(s.deck));
+  ok('черта «Отличник» дала две карты учёбы', s.trait === 'scholar' && s.traitOptions === null && s.deck.study === 6 && !(await p.locator('#traitLay').isVisible()), JSON.stringify(s.deck));
   ok('номер жизни виден рядом с деньгами', /жизнь 2/.test(await p.textContent('#goalText')));
   await p.click('#tabBtn-goals');
   ok('черта показана на вкладке целей', /Черта этой жизни: Отличник/.test(await p.textContent('#traitLine')));
@@ -476,7 +476,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
   }, KEY);
   await p.reload(); await enter(p);
   s = await st(p);
-  ok('старое сохранение продолжилось с колодой', s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 4 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
+  ok('старое сохранение продолжилось с колодой', s.v === 9 && s.sc === 'base' && s.scOptions === null && s.ads === 0 && s.sale === false && s.trait4 === false && s.up.mult === 0 && s.flags.gold === 0 && s.deck.wild === 0 && s.perks.genes === 0 && /опыт: 1$/.test(await p.textContent('#ptsLine')) && s.money === 5200 && s.job === 2 && s.life === 2 && s.charge === 0 && s.xp.work === 0 && s.reels4 === false && s.deck.work === 8 && s.deck.study === 5 && s.deck.coin === 1 && s.deck.chance === 4 && s.deck.bill === 4 && s.trait === null, JSON.stringify({ v: s.v, money: s.money, deck: s.deck }));
   await p.close();
 
   /* 10. Хранилище запрещено */
