@@ -29,7 +29,7 @@ npm run sfx          # заново сделать варианты звуков
 `ONLY=casual N=150 node tools/sim.js` (стратегии: afk, lazy, nofocus, casual, smart, casual+ad, smart+ad, allgold, autoidle и autostudy — автопокупки всего с запасом `RESERVE`; `L=0|1|2` уровень наследия; `STAY=1` играть до 65).
 Ещё в `tools/`: `feasibility.js` — достижимы ли трудные цели; `screenshots.js <html> <папка>` — снимки телефона и десктопа.
 
-Git: ветка `main`, remote нет. В папке могут одновременно работать несколько сессий: чужие незакоммиченные правки не трогай, в коммит добавляй только свои файлы.
+Git: ветка `main`, remote `origin` — `https://github.com/antropos17/zero-to-millionaire.git` (с 24.11.2026), игра публикуется на GitHub Pages через `.github/workflows/pages.yml`. Перед работой сверяй `main` с `origin/main`; пуш только по слову автора. В папке могут одновременно работать несколько сессий: чужие незакоммиченные правки не трогай, в коммит добавляй только свои файлы.
 
 ## Архитектура
 
