@@ -417,7 +417,7 @@ const Core = (() => {
   }
 
   function healthFactor(s) {
-    if (s.health <= 0) return 0;
+    if (s.health <= 0) return 0.25;
     if (s.health < 25) return 0.5;
     if (s.health < 50) return 0.75;
     return 1;
