@@ -1501,11 +1501,11 @@ const Core = (() => {
 
   /* ---------- Цели на жизнь: каждая один раз даёт +1 опыта ---------- */
   const wonBefore = (s, a) => s.wonAt != null && START_AGE + Math.floor(s.wonAt / YEAR) < a;
-  const byAge = (id, a) => ({ id, name: `Миллион до ${a} лет`, test: (s) => wonBefore(s, a), lost: (s) => (s.wonAt != null ? !wonBefore(s, a) : age(s) >= a) });
+  const byAge = (id, a, note = '') => ({ id, name: `Миллион до ${a} лет${note}`, test: (s) => wonBefore(s, a), lost: (s) => (s.wonAt != null ? !wonBefore(s, a) : age(s) >= a) });
   /* цели «миллион без …» считаются по снимку в момент миллиона; до него смотрим, не сорвана ли цель уже сейчас */
   const atWin = (id, name, okWon, brokenNow) => ({ id, name, test: (s) => !!s.won && okWon(s.won), lost: (s) => (s.won ? !okWon(s.won) : brokenNow(s)) });
   const GOALS = [
-    byAge('m50', 50), byAge('m40', 40), byAge('m35', 35), byAge('m30', 30),
+    byAge('m50', 50), byAge('m40', 40, ' (с наследием)'), byAge('m35', 35, ' (с наследием)'), byAge('m30', 30),
     atWin('noreel', 'Миллион без четвёртого барабана', (w) => !w.reels4, (s) => s.reels4),
     atWin('noinvest', 'Миллион без единой инвестиции', (w) => w.assets === 0, (s) => s.assets > 0),
     atWin('nodebt', 'Миллион, ни разу не уйдя в минус', (w) => !w.debt, (s) => s.flags.debt),
@@ -1514,7 +1514,7 @@ const Core = (() => {
     atWin('nogold', 'Миллион без единого золотого варианта', (w) => !w.gold, (s) => s.flags.gold > 0),
     { id: 'levels', name: 'Три символа на третьем уровне', test: (s) => LEVELED.filter((k) => level(s, k) === 3).length >= 3 },
     { id: 'villa', name: 'Дожить до виллы у моря', test: (s) => s.home === HOMES.length - 1 },
-    { id: 'unicorn', name: 'Стать владельцем единорога', test: (s) => s.job === JOBS.length - 1 },
+    { id: 'unicorn', name: 'Владелец единорога (с наследием)', test: (s) => s.job === JOBS.length - 1 },
     { id: 'yes10', name: 'Согласиться на 10 развилок за жизнь', test: (s) => s.flags.yes >= 10 },
     { id: 'sets', name: 'Собрать все шесть сетов за одну жизнь', test: (s) => s.flags.sets.length >= SETS.length },
     { id: 'quad', name: 'Собрать каре на четырёх барабанах', test: (s) => s.flags.quad },
