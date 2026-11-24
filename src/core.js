@@ -215,7 +215,7 @@ const Core = (() => {
   const CHARGE_NEED = [10, 8, 6];
   const INSURE_CUT = [0, 0.4, 0.75];
   /* Золотой вариант развилки: на столько процентных пунктов выше шанс удачи */
-  const GOLD_LUCK = 20;
+  const GOLD_LUCK = 35;
 
   /* Черты: одна на жизнь, выбирается из трёх случайных начиная со второй жизни */
   const TRAITS = {
@@ -511,7 +511,8 @@ const Core = (() => {
   }
 
   /* ---------- Развилки: их открывает пара Шансов ---------- */
-  const pct = (p) => Math.round(p * 100) + '%';
+  /* шанс выше 100% бывает только с золотым вариантом при полной удаче: показываем честные 100% и 0% */
+  const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100) + '%';
   const usd = (n) => '$' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const hp = (st, n) => { st.health = Math.max(0, Math.min(100, st.health + n)); };
   const NOTHING = 'Ничего не изменится';

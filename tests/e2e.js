@@ -226,7 +226,7 @@ const ok = (name, cond, extra) => { console.log((cond ? 'PASS ' : 'FAIL ') + nam
     const b = Core.newState(); Object.assign(b, { fork: 'scam', money: 10000 });
     return { note: plain.gold.note, plainNote: plain.options[0].note, scam: Core.fork(b).gold, leak: '_gold' in a };
   });
-  ok('рискованная развилка: золотой даёт +20% к шансу, у мошенников золотого нет', /^55%/.test(gold2.note) && /^35%/.test(gold2.plainNote) && gold2.scam === null && !gold2.leak, JSON.stringify(gold2));
+  ok('рискованная развилка: золотой даёт +35% к шансу, у мошенников золотого нет', /^70%/.test(gold2.note) && /^35%/.test(gold2.plainNote) && gold2.scam === null && !gold2.leak, JSON.stringify(gold2));
   await p.evaluate(() => { const s = window.z2m.state(); s.fork = null; s.money = 800; s.month = 30; window.z2m.adMs = null; window.z2m.refresh(); });
 
   /* 5б. Звезда «Своего месяца»: копится пустыми месяцами, даёт выбранную тройку */
