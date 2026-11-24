@@ -1,0 +1,6 @@
+# AD=- STARR=- SALEC=- SALER=- (- = как в core.js)
+# рычаги: BILLN=10 JSK=3 JPAY=0.5 SCMONEY=loan:5000,flat:5000
+casual    наследие=0  побед  44%  миллион p10/med/p90: 62/64/65  проигравшие med: $676711  должность: 4  развилок: 20.4  звёзд: 18.4  колода: 50
+   проигравшие к концу p10/med/p90: 376105/676711/905633  (84 жизней)
+   в 40 лет, медианы  выигравшие: money 21338 job 3 skill 209 health 49 net 10 home 3 assets 3 reel4 0% mult 1 study 10 bill 8 deck 40 low 100% debt 0% yes 1
+   в 40 лет, медианы проигравшие: money 21888 job 3 skill 187 health 50 net 10 home 3 assets 3 reel4 0% mult 1 study 10 bill 8 deck 40 low 100% debt 0% yes 1

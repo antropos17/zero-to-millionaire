@@ -49,6 +49,22 @@ if (process.env.GOALS) {
   src = src.replace(goalsCond, 'life === 1');
   if (!process.argv.includes('--goals')) process.argv.push('--goals');
 }
+/* LOSERS=1: накопления проигравших к концу жизни (p10/медиана/p90) и снимок жизни в возрасте SNAP (по умолчанию 40):
+   медианы у выигравших и проигравших — чем бот жил иначе */
+if (process.env.LOSERS) {
+  const rep = (a, b) => { if (!src.includes(a)) throw new Error('sim.js изменился: не найдено ' + a); src = src.replace(a, b); };
+  rep('let wins = 0;', 'let wins = 0; const _W = [], _L = [];');
+  rep('jobs.push(s.job); decks.push(Core.deckSize(s));', 'jobs.push(s.job); decks.push(Core.deckSize(s)); (s.wonAt != null ? _W : _L).push(s);');
+  rep('    if (s.fork) { forks++;', `    if (!s._snap && Core.age(s) >= ${+process.env.SNAP || 40}) s._snap = { money: Math.round(s.money), job: s.job, skill: s.skill, health: Math.round(s.health), net: s.network, home: s.home, assets: s.assets, reel4: s.reels4 ? 1 : 0, mult: s.up.mult, study: s.deck.study, bill: s.deck.bill, deck: Core.deckSize(s), low: s.flags.low ? 1 : 0, debt: s.flags.debt ? 1 : 0, yes: s.flags.yes };
+    if (s.fork) { forks++;`);
+  rep('  return goals;\n}', `  const _m = (arr, k) => { const v = arr.map((x) => (x._snap ? x._snap[k] : NaN)).filter((x) => !isNaN(x)).sort((a, b) => a - b); return v.length ? (['reel4', 'low', 'debt'].includes(k) ? Math.round(100 * v.reduce((a, b) => a + b, 0) / v.length) + '%' : v[Math.floor((v.length - 1) / 2)]) : '-'; };
+  const _K = ['money', 'job', 'skill', 'health', 'net', 'home', 'assets', 'reel4', 'mult', 'study', 'bill', 'deck', 'low', 'debt', 'yes'];
+  console.log(\`   проигравшие к концу p10/med/p90: $\${Math.round(q(finals, 0.1))}/$\${Math.round(q(finals, 0.5))}/$\${Math.round(q(finals, 0.9))}  (\${finals.length} жизней)\`);
+  console.log(\`   в \${+process.env.SNAP || 40} лет, медианы  выигравшие: \` + _K.map((k) => k + ' ' + _m(_W, k)).join(' '));
+  console.log(\`   в \${+process.env.SNAP || 40} лет, медианы проигравшие: \` + _K.map((k) => k + ' ' + _m(_L, k)).join(' '));
+  return goals;
+}`);
+}
 if (process.env.CHECKS) {
   const loop = "for (const p of (process.env.ONLY ?";
   if (!src.includes(loop)) throw new Error('sim.js изменился: цикл стратегий не найден');

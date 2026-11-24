@@ -8,7 +8,7 @@ const Core = (() => {
 
   /* Колода: сколько карт каждого символа лежит на барабанах. Шанс символа = его карты / все карты. */
   const SYMBOLS = ['work', 'study', 'health', 'network', 'chance', 'coin', 'bill', 'wild'];
-  const START_DECK = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 4, wild: 0 };
+  const START_DECK = { work: 6, study: 4, health: 3, network: 2, chance: 3, coin: 0, bill: 10, wild: 0 };
   const FOCI = ['work', 'study', 'health', 'network'];
   const BUYABLE = ['study', 'health', 'network', 'chance'];
   const CARD_BASE = { study: 300, health: 300, network: 400, chance: 500 };
@@ -28,13 +28,14 @@ const Core = (() => {
   ];
   const SET_BY = {};
   SETS.forEach((t) => { SET_BY[t.id] = t; });
-  /* «Удачный год» за рекламу: столько месяцев все доходы вдвое, потом столько же месяцев отдыха */
-  const BOOST_LEN = 12, BOOST_REST = 36;
+  /* «Удачный год» за рекламу: BOOST_LEN месяцев все доходы ×BOOST_K, потом BOOST_REST месяцев отдыха */
+  const BOOST_LEN = 6, BOOST_REST = 36, BOOST_K = 1.5;
   /* Рекламные бонусы: не больше AD_LIMIT за жизнь. В счёт идут золотые варианты, «Удачный год»,
      заряд звезды, скидка и четвёртая черта. Удвоение за время отсутствия в счёт не идёт. */
-  const AD_LIMIT = 16;
-  /* «Зарядить звезду»: «Свой месяц» готов сразу, потом столько месяцев отдыха */
-  const STAR_REST = 24;
+  const AD_LIMIT = 8;
+  /* «Зарядить звезду»: «Свой месяц» готов сразу, потом столько месяцев отдыха.
+     Первый раз — не раньше месяца STAR_FIRST (с 28 лет): ранняя звезда решала жизнь за игрока */
+  const STAR_REST = 24, STAR_FIRST = 120;
   /* «Скидка»: следующая покупка во вкладке «Покупки» дешевле на SALE_CUT, после неё столько месяцев отдыха */
   const SALE_CUT = 0.2, SALE_REST = 24;
   /* Наследие: постоянные улучшения за опыт прошлых жизней. Действуют с начала следующей жизни. */
@@ -98,21 +99,21 @@ const Core = (() => {
   const SC_BASE = 'base';
   const SCENARIOS = {
     loan: {
-      name: 'Студент с кредитом', age: 22, money: -12000, skill: 55, health: 60, network: 2, home: 0, job: 0,
-      note: 'Старт в 22 года: навык 55, но долг $12 000 за учёбу и здоровье 60',
-      intro: 'Тебе 22: диплом, навык 55, здоровье 60 после сессий и $12 000 студенческого кредита.',
+      name: 'Студент с кредитом', age: 22, money: -1500, skill: 55, health: 60, network: 2, home: 0, job: 0,
+      note: 'Старт в 22 года: навык 55, но долг $1 500 за учёбу и здоровье 60',
+      intro: 'Тебе 22: диплом, навык 55, здоровье 60 после сессий и $1 500 студенческого кредита.',
       epi: 'Начал с диплома и кредита за учёбу.',
     },
     late: {
-      name: 'Поздний старт', age: 26, money: 15000, skill: 60, health: 55, network: 6, home: 1, job: 0,
-      note: 'Старт в 26 лет: $15 000, навык 60, связи 6, койка в хостеле, здоровье 55',
-      intro: 'Тебе 26: восемь лет ушли не туда. Есть $15 000, навык 60 и пара знакомых. Начинаешь заново.',
+      name: 'Поздний старт', age: 26, money: 20000, skill: 60, health: 55, network: 6, home: 1, job: 0,
+      note: 'Старт в 26 лет: $20 000, навык 60, связи 6, койка в хостеле, здоровье 55',
+      intro: 'Тебе 26: восемь лет ушли не туда. Есть $20 000, навык 60 и пара знакомых. Начинаешь заново.',
       epi: 'Начал заново в 26.',
     },
     flat: {
-      name: 'Бабушкина однушка', age: 24, money: -12000, skill: 30, health: 60, network: 3, home: 3, job: 0,
-      note: 'Старт в 24 года в своей однушке, но с долгом $12 000 за неё',
-      intro: 'Тебе 24: бабушка оставила однушку и $12 000 долга за неё.',
+      name: 'Бабушкина однушка', age: 24, money: -3000, skill: 70, health: 60, network: 3, home: 3, job: 0,
+      note: 'Старт в 24 года в своей однушке, навык 70, но долг $3 000 за неё',
+      intro: 'Тебе 24: навык 70, бабушка оставила однушку и $3 000 долга за неё.',
       epi: 'Начал с бабушкиной однушки и её долга.',
     },
   };
@@ -158,15 +159,15 @@ const Core = (() => {
 
   const JOBS = [
     { name: 'Раздаёшь листовки', pay: 80, skill: 0 },
-    { name: 'Курьер', pay: 95, skill: 10 },
-    { name: 'Бариста', pay: 110, skill: 35 },
-    { name: 'Джун', pay: 160, skill: 69 },
-    { name: 'Мидл', pay: 230, skill: 114 },
-    { name: 'Сеньор', pay: 335, skill: 173 },
-    { name: 'Тимлид', pay: 470, skill: 242 },
-    { name: 'Техдир стартапа', pay: 655, skill: 328 },
-    { name: 'Фаундер', pay: 900, skill: 432 },
-    { name: 'Владелец единорога', pay: 1225, skill: 554 },
+    { name: 'Курьер', pay: 90, skill: 13 },
+    { name: 'Бариста', pay: 98, skill: 58 },
+    { name: 'Джун', pay: 133, skill: 138 },
+    { name: 'Мидл', pay: 179, skill: 266 },
+    { name: 'Сеньор', pay: 242, skill: 461 },
+    { name: 'Тимлид', pay: 313, skill: 726 },
+    { name: 'Техдир стартапа', pay: 400, skill: 1093 },
+    { name: 'Фаундер', pay: 500, skill: 1584 },
+    { name: 'Владелец единорога', pay: 613, skill: 2216 },
   ];
 
   const HOMES = [
@@ -241,7 +242,7 @@ const Core = (() => {
       bought: { study: 0, health: 0, network: 0, chance: 0, wild: 0 }, billsCut: 0, cut: 0,
       charge: P.star ? CHARGE_NEED[0] : 0, xp: { work: 0, study: 0, health: 0, network: 0 }, reels4: false,
       up: { mult: 0, star: 0, insure: 0, coach: 0 }, boost: 0, boostAt: 0,
-      ads: 0, starAt: 0, saleAt: 0, sale: false, trait4: false,
+      ads: 0, starAt: STAR_FIRST, saleAt: 0, sale: false, trait4: false,
       focus: 'work', fork: null, lastForks: [], ms: 0,
       trait: null, traitOptions: null,
       sc: SC_BASE, scOptions: null,
@@ -305,9 +306,10 @@ const Core = (() => {
   function migrate(s) {
     if (s && s.v === 2) { s.v = 3; s.charge = 0; s.xp = { work: 0, study: 0, health: 0, network: 0 }; s.reels4 = false; }
     if (s && s.v === 3) {
+      /* жизнь из v3 начиналась с 4 картами Счетов: колода собирается по тогдашнему старту */
       const cutBills = Math.min(3, s.finlit || 0), study = Math.min(8, Math.floor((s.courses || 0) / 4));
       s.v = 4;
-      s.deck = Object.assign({}, START_DECK, { work: START_DECK.work + (s.job || 0), study: START_DECK.study + study, coin: s.assets || 0, chance: START_DECK.chance + (s.ms || 0), bill: START_DECK.bill - cutBills });
+      s.deck = Object.assign({}, START_DECK, { work: START_DECK.work + (s.job || 0), study: START_DECK.study + study, coin: s.assets || 0, chance: START_DECK.chance + (s.ms || 0), bill: 4 - cutBills });
       s.bought = { study, health: 0, network: 0, chance: 0 };
       s.billsCut = cutBills; s.cut = 0;
       s.lastForks = s.lastFork ? [s.lastFork] : [];
@@ -331,10 +333,12 @@ const Core = (() => {
     if (s && s.v === 7) {
       s.v = 8;
       s.ads = Math.min(AD_LIMIT, (s.flags && s.flags.gold) | 0);
-      s.starAt = 0; s.saleAt = 0; s.sale = false; s.trait4 = false;
+      s.starAt = STAR_FIRST; s.saleAt = 0; s.sale = false; s.trait4 = false;
     }
     /* до v9 сценариев не было: любая жизнь — стандартный старт */
     if (s && s.v === 8) { s.v = 9; s.sc = SC_BASE; s.scOptions = null; }
+    /* лимит рекламы стал меньше (16 → 8) без новой версии: старая жизнь доигрывает, но сверх лимита не берёт */
+    if (s && s.v === 9 && s.ads > AD_LIMIT) s.ads = AD_LIMIT;
     return s;
   }
 
@@ -1188,11 +1192,11 @@ const Core = (() => {
     if (s.status !== 'playing' || s.fork || s.traitOptions || s.scOptions) return null;
     const ev = evaluate(s, reels);
     const before = s.money;
-    /* «Удачный год»: зарплата, пассив и деньги хороших событий вдвое */
-    const k = s.boost > 0 ? 2 : 1;
-    const pay = salary(s) * k;
+    /* «Удачный год»: зарплата, пассив и деньги хороших событий ×BOOST_K */
+    const k = s.boost > 0 ? BOOST_K : 1;
+    const pay = Math.round(salary(s) * k);
     const base = baseSalary(s);
-    const inc = passive(s) * k;
+    const inc = Math.round(passive(s) * k);
     const yearBefore = age(s);
     const parts = [];
     const levelUps = [];
@@ -1263,7 +1267,7 @@ const Core = (() => {
       : tones.every((t) => t === 'plain') ? 'plain' : tones.includes('bad') && event < 0 ? 'bad' : 'good';
     return {
       reels, combos: parts, combo: parts[0] || null, text: parts.length ? parts.map((x) => x.text).join('; ') : 'Обычный месяц',
-      tone, delta, event, gain, pay, inc, milestone, levelUps, chargeFull, mult, boosted: k === 2, million,
+      tone, delta, event, gain, pay, inc, milestone, levelUps, chargeFull, mult, boosted: k > 1, million,
       charged: !!(opts && opts.charged), birthday: age(s) !== yearBefore,
     };
   }
@@ -1483,8 +1487,8 @@ const Core = (() => {
 
   return {
     GOAL, START_AGE, END_AGE, YEAR, TOTAL, SYMBOLS, START_DECK, FOCI, BUYABLE, JOBS, HOMES, ASSETS,
-    AD_LIMIT, STAR_REST, SALE_CUT, SALE_REST, adsLeft, starReady, chargeStar, saleReady, startSale, onSale, traitMore, extraTrait,
-    MILESTONES, PAY, CARD_BASE, CARD_GROW, BILL_REMOVE, SKILL_PCT, NET_PCT, NET_CAP, LUCK_CAP, FORK_IDS, SETS, WILD_COSTS, PERKS, PERK_IDS, WEALTH, BOOST_LEN, BOOST_REST,
+    AD_LIMIT, STAR_REST, STAR_FIRST, SALE_CUT, SALE_REST, adsLeft, starReady, chargeStar, saleReady, startSale, onSale, traitMore, extraTrait,
+    MILESTONES, PAY, CARD_BASE, CARD_GROW, BILL_REMOVE, SKILL_PCT, NET_PCT, NET_CAP, LUCK_CAP, FORK_IDS, SETS, WILD_COSTS, PERKS, PERK_IDS, WEALTH, BOOST_LEN, BOOST_REST, BOOST_K,
     evaluate, normPerks, perkCost, lifePoints, retire, boostReady, startBoost, TRAITS, TRAIT_IDS, GOALS, CARD_NAME,
     CHARGE_MAX, LEVELED, XP_LEVELS, LEVEL_MULT, REEL4_COST, UPGRADES, UP_IDS, MULT_TABLES, CHARGE_NEED, INSURE_CUT, GOLD_LUCK,
     chargeMax, multTable, multMean, upCost,
