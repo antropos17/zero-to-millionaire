@@ -41,7 +41,7 @@ const file = 'file://' + path.resolve(process.argv[2]);
     await p.click('#tabBtn-' + tab);
     await p.waitForTimeout(1500);
     if (COMFORT && ((await p.textContent('#speedBtn')) !== '×8' || !(await p.evaluate(() => window.z2m.meta().autobuy.on)))) console.log('   «УДОБСТВО» НЕ ПРИМЕНИЛОСЬ');
-    const out = await p.evaluate(([tab, comfort]) => new Promise((done) => {
+    const out = await p.evaluate(([tab, comfort]) => new Promise((done, fail) => {
       const shifts = [];
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) for (const s of e.sources || []) {
@@ -58,14 +58,19 @@ const file = 'file://' + path.resolve(process.argv[2]);
       const q = (k) => document.querySelector(`li[data-kind="${SEL[k] || k}"] .btn-buy`);
       const rows = () => Array.from(document.querySelectorAll(tab === 'deck' ? '#deck li' : '#shop li')).map((li) => Math.round(li.getBoundingClientRect().height));
       const seen = new Set();
-      let frames = 0;
+      let frames = 0, modalTries = 0;
+      const MODAL_TRIES = 300;
       const step = () => {
         const S = window.z2m.state();
         seen.add(rows().join(','));
         /* открытое окно (например «Первый миллион!») игрок закрывает, а не мотает месяцы под ним; кнопка продолжает жизнь.
-           Первые 350 мс окно нажатий не принимает, поэтому жмём каждый кадр, пока не закроется */
+           Первые 350 мс окно нажатий не принимает, поэтому жмём каждый кадр, пока не закроется, но не дольше MODAL_TRIES кадров подряд */
         const box = document.getElementById('modalBox');
-        if (S.status === 'playing' && box.offsetParent) { document.getElementById('modalBtn').click(); requestAnimationFrame(step); return; }
+        if (S.status === 'playing' && box.offsetParent) {
+          if (++modalTries > MODAL_TRIES) { fail(new Error(`окно #modalBox не закрылось за ${MODAL_TRIES} кадров нажатий #modalBtn (месяц ${S.month}): «${box.textContent.trim().slice(0, 60)}»`)); return; }
+          document.getElementById('modalBtn').click(); requestAnimationFrame(step); return;
+        }
+        modalTries = 0;
         if (S.status !== 'playing' || frames++ > 700) { setTimeout(() => done({ shifts, rowSets: Array.from(seen), months: S.month, status: S.status }), 300); return; }
         if (comfort) {
           /* автопокупки за месяц; иногда выключаются и включаются в одно касание */
@@ -93,7 +98,7 @@ const file = 'file://' + path.resolve(process.argv[2]);
         requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
-    }), [tab, COMFORT]);
+    }), [tab, COMFORT]).catch(async (e) => { await browser.close(); throw e; });
     const by = {};
     for (const s of out.shifts) { by[s.label] = by[s.label] || { n: 0, dy: 0, dx: 0, dh: 0 }; const b = by[s.label]; b.n++; b.dy = Math.max(b.dy, Math.abs(s.dy)); b.dx = Math.max(b.dx, Math.abs(s.dx)); b.dh = Math.max(b.dh, Math.abs(s.dh)); }
     const notJob = out.shifts.filter((s) => s.label !== '#jobText').length;
@@ -102,8 +107,8 @@ const file = 'file://' + path.resolve(process.argv[2]);
     console.log(`\n== вкладка ${tab}, ${name}: жизнь до ${out.status} (${out.months} мес.), сдвигов всего ${out.shifts.length}, кроме смены названия должности: ${notJob}`);
     console.log('   высоты строк за всю жизнь:', out.rowSets.length === 1 ? 'одни и те же: ' + out.rowSets[0] : out.rowSets.length + ' вариантов: ' + out.rowSets.slice(0, 4).join(' | '));
     for (const [k, v] of Object.entries(by).sort((a, b) => b[1].n - a[1].n).slice(0, 8)) console.log(`   ${String(v.n).padStart(4)}×  ${k}   до ${v.dy}px по вертикали, ${v.dx}px по горизонтали, высота ±${v.dh}px`);
-    /* все вертикальные сдвиги, даже разовые, которые не попали в 8 самых частых */
-    for (const s of out.shifts.filter((s) => s.dy)) console.log(`   ВЕРТИКАЛЬНО: ${s.label}, вкладка ${tab}, ${name}, ${s.dy}px (месяц ${s.month})`);
+    /* все вертикальные сдвиги из счётчика вертикальных, даже разовые, которые не попали в 8 самых частых */
+    for (const s of out.shifts.filter((s) => s.label !== '#jobText' && s.dy)) console.log(`   ВЕРТИКАЛЬНО: ${s.label}, вкладка ${tab}, ${name}, ${s.dy}px (месяц ${s.month})`);
     if (errors.length) console.log('   ошибки:', errors);
     await ctx.close();
   }
