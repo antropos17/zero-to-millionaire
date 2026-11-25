@@ -88,3 +88,10 @@ Git: ветка `main`, remote `origin` — `https://github.com/antropos17/zero-
 - Звук — дубли earshot (`tools/sfx.json`, `assets/sounds`, `npm run sfx`) с синтезом как запасным вариантом; выбор вариантов сделан вслепую, звук никто не слушал. Выбрать на слух: `dist/sound-check.html`, сменить — `node tools/sfx.js pick <событие> <1|2|3|synth>` и `npm run build`. Подробно — `docs/SOUND.md`.
 - Автоспин включён по умолчанию: это осознанное решение автора.
 - Реклама ограничена: не больше `AD_LIMIT` (8) бонусов за жизнь (золотые варианты, «Удачный год», заряд звезды, скидка, четвёртая черта), у каждого бонуса в разделе «Бонусы» свой отдых. Удвоение за время отсутствия в лимит не входит. Внутри лимита на скорости ×1 «Удачный год» всё ещё доступен примерно раз в минуту с четвертью (42 месяца по 1,8 с). «Удачный год»: доходы ×1,5 на 6 месяцев, отдых 36 (`BOOST_K`, `BOOST_LEN`, `BOOST_REST`); первая «Зарядить звезду» — с 28 лет (`STAR_FIRST` = 120 месяцев).
+
+## Progress tracker
+
+Руслан and Сеймур follow this project on a shared tracker, and Claude posts every finished stage there. The protocol is in `tools/tracker/README.md`.
+
+- Before starting a change that is visible on screen, take a "before" screenshot of the affected screen: `node tools/tracker/report.mjs shot <url> .claude/shots/<slug>-before.png`. After the change is verified, take the "after" shot of the same screen, size and state.
+- After a `git push` or a finished, verified stage, post the stage with both screenshots, its section and the change lines (`+` new, `~` changed, `!` fixed, `-` removed).
