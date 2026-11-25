@@ -114,4 +114,5 @@ const file = 'file://' + path.resolve(process.argv[2]);
   }
   await browser.close();
   console.log('\nлишних сдвигов:', grand, `(вертикальных ${vert}, горизонтальных ${grand - vert})`);
+  if (vert) { console.log(`ПРОВАЛ: вертикальных сдвигов ${vert}, код выхода 1`); process.exitCode = 1; }
 })();
